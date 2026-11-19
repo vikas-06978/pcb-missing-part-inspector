@@ -2,44 +2,75 @@
  * Interactive box editor for naming components on the reference board.
  *
  * The brief has the operator point out and name each part once, and at the
- * live demo someone who has never seen this app will do exactly that while
- * being watched. So the interaction has to be the one everybody already
- * knows from image editors: drag to draw, click to select, handles to resize,
- * Delete to remove, Ctrl+Z to undo, wheel to zoom.
+ * live demo someone who has never seen this app does exactly that while being
+ * watched. So the canvas deliberately copies the conventions people already
+ * have in their fingers from Figma, Illustrator and every map on the web:
  *
- * Renaming deliberately happens in the side list rather than in an in-canvas
- * text field: a real input gets native caret handling, selection and IME for
- * free, and a double-click on the canvas simply focuses it.
+ *   scroll / two-finger drag ....... pan
+ *   ctrl or cmd + scroll, pinch .... zoom at the pointer
+ *   space + drag, middle drag ...... pan
+ *   V / R .......................... select tool, draw tool
+ *   drag on empty (draw tool) ...... new part
+ *   drag on empty (select tool) .... marquee select
+ *   shift-click .................... add or remove from selection
+ *   alt + drag ..................... duplicate
+ *   arrows / shift+arrows .......... nudge 1 px / 10 px
+ *   ctrl+A, ctrl+D, Del, F2 ........ select all, duplicate, delete, rename
+ *   shift+1 / shift+2 / shift+0 .... zoom fit / to selection / 100%
+ *
+ * The one deliberate break from Figma: with the draw tool active, dragging on
+ * empty canvas creates a part rather than a marquee. Drawing boxes *is* the
+ * task here, and making the common action the default saves a tool switch on
+ * every single part.
+ *
+ * Renaming happens in the side list rather than in an in-canvas text field: a
+ * real input gets native caret handling, selection and IME for free.
  */
 
 import { CanvasView, drawLabel, roundedRectPath } from './view.js';
 import { cssVar } from './ui.js';
 
 const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
-const HANDLE_HIT = 9;       // screen px
-const HANDLE_SIZE = 7;      // screen px
-const MIN_BOX = 6;          // image px
-const MAX_HISTORY = 60;
+const HANDLE_HIT = 9;        // screen px
+const HANDLE_SIZE = 7;       // screen px
+const MIN_BOX = 6;           // image px
+const MAX_HISTORY = 80;
+const SNAP_SCREEN_PX = 6;    // snapping tolerance, in screen px so it feels
+                             // the same at every zoom level
+const MARQUEE_MIN = 4;       // screen px before a click becomes a drag
 
 let nextLocalId = 1;
 const makeId = () => `n${(nextLocalId++).toString(36)}${Date.now().toString(36).slice(-4)}`;
 
+const CURSORS = {
+  nw: 'nwse-resize', se: 'nwse-resize',
+  ne: 'nesw-resize', sw: 'nesw-resize',
+  n: 'ns-resize', s: 'ns-resize',
+  e: 'ew-resize', w: 'ew-resize',
+};
+
 export class Annotator {
-  constructor({ canvas, host, emptyHint, onChange, onSelect, onRenameRequest }) {
+  constructor({ canvas, host, emptyHint, onChange, onSelect, onRenameRequest, onToolChange }) {
     this.view = new CanvasView(canvas, host);
     this.host = host;
     this.emptyHint = emptyHint;
     this.onChange = onChange || (() => {});
     this.onSelect = onSelect || (() => {});
     this.onRenameRequest = onRenameRequest || (() => {});
+    this.onToolChange = onToolChange || (() => {});
 
     this.image = null;
     this.parts = [];
-    this.selectedId = null;
+    this.selectedIds = new Set();
+    this.hoveredId = null;
 
+    this.tool = 'draw';
     this.mode = 'idle';
     this.draft = null;
+    this.marquee = null;
+    this.guides = [];
     this.spaceDown = false;
+
     this._drag = null;
     this._frame = null;
 
@@ -70,7 +101,7 @@ export class Annotator {
       this.history = [];
       this.future = [];
     }
-    this.selectedId = null;
+    this.selectedIds.clear();
     this._emit();
   }
 
@@ -80,6 +111,23 @@ export class Annotator {
 
   get count() {
     return this.parts.length;
+  }
+
+  /** Back-compat for callers that only care about a single selection. */
+  get selectedId() {
+    return this.selectedIds.size === 1 ? [...this.selectedIds][0] : null;
+  }
+
+  isSelected(id) {
+    return this.selectedIds.has(id);
+  }
+
+  setTool(tool) {
+    if (tool !== 'draw' && tool !== 'select') return;
+    this.tool = tool;
+    this.onToolChange(tool);
+    this._applyCursor();
+    this.requestDraw();
   }
 
   // ---- mutation with undo ------------------------------------------------
@@ -94,7 +142,7 @@ export class Annotator {
     if (!this.history.length) return false;
     this.future.push(JSON.stringify(this.parts));
     this.parts = JSON.parse(this.history.pop());
-    if (!this.parts.some((p) => p.id === this.selectedId)) this.selectedId = null;
+    this._pruneSelection();
     this._emit();
     return true;
   }
@@ -103,17 +151,33 @@ export class Annotator {
     if (!this.future.length) return false;
     this.history.push(JSON.stringify(this.parts));
     this.parts = JSON.parse(this.future.pop());
+    this._pruneSelection();
     this._emit();
     return true;
+  }
+
+  _pruneSelection() {
+    const ids = new Set(this.parts.map((p) => p.id));
+    for (const id of [...this.selectedIds]) {
+      if (!ids.has(id)) this.selectedIds.delete(id);
+    }
   }
 
   addParts(boxes, namePrefix = 'Part') {
     this._snapshot();
     let index = this.parts.length;
+    const added = [];
     for (const bbox of boxes) {
       index += 1;
-      this.parts.push({ id: makeId(), name: `${namePrefix} ${index}`, bbox: bbox.map(Math.round) });
+      const part = {
+        id: makeId(),
+        name: `${namePrefix} ${index}`,
+        bbox: this._clampBox(bbox.map(Math.round)),
+      };
+      this.parts.push(part);
+      added.push(part.id);
     }
+    this.selectedIds = new Set(added);
     this._emit();
   }
 
@@ -130,7 +194,33 @@ export class Annotator {
     if (index < 0) return;
     this._snapshot();
     this.parts.splice(index, 1);
-    if (this.selectedId === id) this.selectedId = null;
+    this.selectedIds.delete(id);
+    this._emit();
+  }
+
+  deleteSelected() {
+    if (!this.selectedIds.size) return;
+    this._snapshot();
+    this.parts = this.parts.filter((p) => !this.selectedIds.has(p.id));
+    this.selectedIds.clear();
+    this._emit();
+  }
+
+  duplicateSelected(offset = 14) {
+    if (!this.selectedIds.size) return;
+    this._snapshot();
+    const copies = [];
+    for (const part of this.parts.filter((p) => this.selectedIds.has(p.id))) {
+      copies.push({
+        id: makeId(),
+        name: `${part.name} copy`,
+        bbox: this._clampBox([
+          part.bbox[0] + offset, part.bbox[1] + offset, part.bbox[2], part.bbox[3],
+        ]),
+      });
+    }
+    this.parts.push(...copies);
+    this.selectedIds = new Set(copies.map((c) => c.id));
     this._emit();
   }
 
@@ -138,11 +228,18 @@ export class Annotator {
     if (!this.parts.length) return;
     this._snapshot();
     this.parts = [];
-    this.selectedId = null;
+    this.selectedIds.clear();
     this._emit();
   }
 
+  selectAll() {
+    this.selectedIds = new Set(this.parts.map((p) => p.id));
+    this.onSelect(this.selectedId);
+    this.requestDraw();
+  }
+
   autoName(prefix = 'Part') {
+    if (!this.parts.length) return;
     this._snapshot();
     // Reading order: top to bottom, then left to right, so the numbering
     // matches how someone scans the board rather than when boxes were drawn.
@@ -158,9 +255,16 @@ export class Annotator {
     this._emit();
   }
 
-  select(id) {
-    this.selectedId = id;
-    this.onSelect(id);
+  select(id, { additive = false } = {}) {
+    if (id === null) {
+      this.selectedIds.clear();
+    } else if (additive) {
+      if (this.selectedIds.has(id)) this.selectedIds.delete(id);
+      else this.selectedIds.add(id);
+    } else {
+      this.selectedIds = new Set([id]);
+    }
+    this.onSelect(this.selectedId);
     this.requestDraw();
   }
 
@@ -170,6 +274,28 @@ export class Annotator {
     const [x, y, w, h] = part.bbox;
     this.view.focusOn(x, y, w, h);
     this.select(id);
+  }
+
+  zoomToSelection() {
+    const box = this._selectionBounds();
+    if (!box) {
+      this.view.fit(24, { animate: true });
+      return;
+    }
+    this.view.zoomToRect(box.x, box.y, box.w, box.h, { padding: 110, maxScale: 7 });
+  }
+
+  _selectionBounds() {
+    const chosen = this.parts.filter((p) => this.selectedIds.has(p.id));
+    if (!chosen.length) return null;
+    let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
+    for (const { bbox } of chosen) {
+      x0 = Math.min(x0, bbox[0]);
+      y0 = Math.min(y0, bbox[1]);
+      x1 = Math.max(x1, bbox[0] + bbox[2]);
+      y1 = Math.max(y1, bbox[1] + bbox[3]);
+    }
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
   }
 
   _emit() {
@@ -200,8 +326,10 @@ export class Annotator {
   }
 
   _handleAt(point) {
-    if (!this.selectedId) return null;
-    const part = this.parts.find((p) => p.id === this.selectedId);
+    // Resize handles only make sense for exactly one selected box.
+    const id = this.selectedId;
+    if (!id) return null;
+    const part = this.parts.find((p) => p.id === id);
     if (!part) return null;
     const points = this._handlePoints(this._screenRect(part));
     for (const key of HANDLES) {
@@ -227,17 +355,82 @@ export class Annotator {
     return null;
   }
 
+  // ---- snapping ----------------------------------------------------------
+
+  /**
+   * Nudge a moving rectangle onto its neighbours' edges and centres.
+   *
+   * Boards are laid out on a grid, so parts genuinely do line up; without
+   * snapping, forty hand-drawn boxes end up a pixel or two out from each other
+   * and the annotation looks sloppy even when it is accurate enough.
+   */
+  _snap(box, ignoreIds) {
+    const tolerance = SNAP_SCREEN_PX / this.view.scale;
+    const [x, y, w, h] = box;
+
+    const vTargets = [0, this.image.naturalWidth];
+    const hTargets = [0, this.image.naturalHeight];
+    for (const part of this.parts) {
+      if (ignoreIds.has(part.id)) continue;
+      const [px, py, pw, ph] = part.bbox;
+      vTargets.push(px, px + pw / 2, px + pw);
+      hTargets.push(py, py + ph / 2, py + ph);
+    }
+
+    const pick = (candidates, targets) => {
+      let best = null;
+      for (const { value, offset } of candidates) {
+        for (const target of targets) {
+          const delta = target - value;
+          if (Math.abs(delta) <= tolerance && (!best || Math.abs(delta) < Math.abs(best.delta))) {
+            best = { delta, target, offset };
+          }
+        }
+      }
+      return best;
+    };
+
+    const vBest = pick(
+      [{ value: x, offset: 0 }, { value: x + w / 2, offset: w / 2 }, { value: x + w, offset: w }],
+      vTargets,
+    );
+    const hBest = pick(
+      [{ value: y, offset: 0 }, { value: y + h / 2, offset: h / 2 }, { value: y + h, offset: h }],
+      hTargets,
+    );
+
+    const guides = [];
+    let nx = x;
+    let ny = y;
+    if (vBest) {
+      nx = Math.round(vBest.target - vBest.offset);
+      guides.push({ axis: 'v', at: vBest.target });
+    }
+    if (hBest) {
+      ny = Math.round(hBest.target - hBest.offset);
+      guides.push({ axis: 'h', at: hBest.target });
+    }
+
+    this.guides = guides;
+    return [nx, ny, w, h];
+  }
+
   // ---- pointer interaction ----------------------------------------------
 
   _bindPointer() {
     const canvas = this.view.canvas;
 
+    canvas.addEventListener('contextmenu', (event) => event.preventDefault());
+
     canvas.addEventListener('pointerdown', (event) => {
       if (!this.image) return;
       canvas.setPointerCapture(event.pointerId);
+      this.view.cancelAnimation();
       const point = this.view.pointer(event);
 
-      if (event.button === 1 || this.spaceDown) {
+      // Pan: middle button, right button, or space held — all three are
+      // muscle memory somewhere, and none of them conflict with drawing.
+      if (event.button === 1 || event.button === 2 || this.spaceDown) {
         this.mode = 'pan';
         this._drag = { startX: event.clientX, startY: event.clientY };
         this.host.classList.add('is-panning');
@@ -255,19 +448,46 @@ export class Annotator {
       }
 
       const hit = this._partAt(point);
+      const additive = event.shiftKey || event.metaKey || event.ctrlKey;
+
       if (hit) {
-        this.select(hit.id);
-        this._snapshot();
-        this.mode = 'move';
+        if (additive) {
+          this.select(hit.id, { additive: true });
+          if (!this.selectedIds.has(hit.id)) return;   // just removed it
+        } else if (!this.selectedIds.has(hit.id)) {
+          this.select(hit.id);
+        }
+
+        if (event.altKey) this.duplicateSelected(0);
+        else this._snapshot();
+
         const image = this.view.toImage(point.x, point.y);
-        this._drag = { part: hit, origin: [...hit.bbox], grabX: image.x, grabY: image.y };
+        this.mode = 'move';
+        this._drag = {
+          anchor: hit.id,
+          grabX: image.x,
+          grabY: image.y,
+          origins: new Map(
+            this.parts
+              .filter((p) => this.selectedIds.has(p.id))
+              .map((p) => [p.id, [...p.bbox]]),
+          ),
+        };
         return;
       }
 
-      this.select(null);
-      this.mode = 'draw';
+      // Empty canvas.
+      if (!additive) this.select(null);
       const image = this.view.toImage(point.x, point.y);
-      this.draft = { x0: image.x, y0: image.y, x1: image.x, y1: image.y };
+
+      if (this.tool === 'select') {
+        this.mode = 'marquee';
+        this.marquee = { x0: point.x, y0: point.y, x1: point.x, y1: point.y };
+        this._drag = { base: new Set(additive ? this.selectedIds : []) };
+      } else {
+        this.mode = 'draw';
+        this.draft = { x0: image.x, y0: image.y, x1: image.x, y1: image.y };
+      }
     });
 
     canvas.addEventListener('pointermove', (event) => {
@@ -275,7 +495,13 @@ export class Annotator {
       const point = this.view.pointer(event);
 
       if (this.mode === 'idle') {
-        this._updateCursor(point);
+        const hit = this._partAt(point);
+        const hoveredId = hit ? hit.id : null;
+        if (hoveredId !== this.hoveredId) {
+          this.hoveredId = hoveredId;
+          this.requestDraw();
+        }
+        this._applyCursor(point);
         return;
       }
 
@@ -283,6 +509,14 @@ export class Annotator {
         this.view.panBy(event.clientX - this._drag.startX, event.clientY - this._drag.startY);
         this._drag.startX = event.clientX;
         this._drag.startY = event.clientY;
+        return;
+      }
+
+      if (this.mode === 'marquee') {
+        this.marquee.x1 = point.x;
+        this.marquee.y1 = point.y;
+        this._updateMarqueeSelection();
+        this.requestDraw();
         return;
       }
 
@@ -296,13 +530,27 @@ export class Annotator {
       }
 
       if (this.mode === 'move') {
-        const { part, origin, grabX, grabY } = this._drag;
-        part.bbox = this._clampBox([
-          Math.round(origin[0] + (image.x - grabX)),
-          Math.round(origin[1] + (image.y - grabY)),
-          origin[2],
-          origin[3],
-        ]);
+        const { grabX, grabY, origins, anchor } = this._drag;
+        let dx = Math.round(image.x - grabX);
+        let dy = Math.round(image.y - grabY);
+
+        // Snap using the anchor box, then shift the whole selection by the
+        // same correction so relative positions never change.
+        const anchorOrigin = origins.get(anchor);
+        if (anchorOrigin && !event.altKey) {
+          const proposed = [anchorOrigin[0] + dx, anchorOrigin[1] + dy, anchorOrigin[2], anchorOrigin[3]];
+          const snapped = this._snap(proposed, this.selectedIds);
+          dx += snapped[0] - proposed[0];
+          dy += snapped[1] - proposed[1];
+        } else {
+          this.guides = [];
+        }
+
+        for (const part of this.parts) {
+          const origin = origins.get(part.id);
+          if (!origin) continue;
+          part.bbox = this._clampBox([origin[0] + dx, origin[1] + dy, origin[2], origin[3]]);
+        }
         this.requestDraw();
         return;
       }
@@ -330,18 +578,23 @@ export class Annotator {
           this._snapshot();
           const part = { id: makeId(), name: `Part ${this.parts.length + 1}`, bbox: box };
           this.parts.push(part);
-          this.selectedId = part.id;
+          this.selectedIds = new Set([part.id]);
           this._emit();
           this.onSelect(part.id);
           this.onRenameRequest(part.id);
         }
+      } else if (this.mode === 'marquee') {
+        this.marquee = null;
+        this.onSelect(this.selectedId);
       } else if (this.mode === 'move' || this.mode === 'resize') {
         this._emit();
       }
 
       this.mode = 'idle';
       this._drag = null;
+      this.guides = [];
       this.host.classList.remove('is-panning');
+      this._applyCursor();
       this.requestDraw();
     };
 
@@ -360,30 +613,66 @@ export class Annotator {
       if (!this.image) return;
       event.preventDefault();
       const point = this.view.pointer(event);
-      // Trackpads send many small deltas; the exponential keeps the response
-      // even across a mouse wheel's coarse clicks and a trackpad's fine ones.
-      this.view.zoomAt(Math.exp(-event.deltaY * 0.0022), point.x, point.y);
+
+      // A trackpad pinch arrives as a wheel event with ctrlKey set; a plain
+      // two-finger drag does not. Following that distinction gives pinch-zoom
+      // and two-finger pan for free, which is what every canvas app does and
+      // what a first-time user will try.
+      if (event.ctrlKey || event.metaKey) {
+        this.view.zoomAt(Math.exp(-event.deltaY * 0.01), point.x, point.y);
+        return;
+      }
+
+      const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? this.view.height : 1;
+      let dx = event.deltaX * unit;
+      let dy = event.deltaY * unit;
+      if (event.shiftKey && dx === 0) {
+        dx = dy;
+        dy = 0;
+      }
+      this.view.panBy(-dx, -dy);
     }, { passive: false });
   }
 
-  _updateCursor(point) {
+  _updateMarqueeSelection() {
+    const { x0, y0, x1, y1 } = this.marquee;
+    if (Math.abs(x1 - x0) < MARQUEE_MIN && Math.abs(y1 - y0) < MARQUEE_MIN) return;
+
+    const left = Math.min(x0, x1);
+    const right = Math.max(x0, x1);
+    const top = Math.min(y0, y1);
+    const bottom = Math.max(y0, y1);
+
+    const next = new Set(this._drag.base);
+    for (const part of this.parts) {
+      const rect = this._screenRect(part);
+      // Touch-select rather than fully-enclose: on a dense board the fully
+      // enclosing rule makes you drag across the whole canvas to catch a row.
+      const hits =
+        rect.x < right && rect.x + rect.w > left &&
+        rect.y < bottom && rect.y + rect.h > top;
+      if (hits) next.add(part.id);
+    }
+    this.selectedIds = next;
+  }
+
+  _applyCursor(point) {
     const canvas = this.view.canvas;
-    if (this.spaceDown) {
-      canvas.style.cursor = 'grab';
+    if (this.spaceDown || this.mode === 'pan') {
+      canvas.style.cursor = this.mode === 'pan' ? 'grabbing' : 'grab';
       return;
     }
-    const handle = this._handleAt(point);
-    if (handle) {
-      const cursors = {
-        nw: 'nwse-resize', se: 'nwse-resize',
-        ne: 'nesw-resize', sw: 'nesw-resize',
-        n: 'ns-resize', s: 'ns-resize',
-        e: 'ew-resize', w: 'ew-resize',
-      };
-      canvas.style.cursor = cursors[handle];
-      return;
+    if (point) {
+      if (this._handleAt(point)) {
+        canvas.style.cursor = CURSORS[this._handleAt(point)];
+        return;
+      }
+      if (this._partAt(point)) {
+        canvas.style.cursor = 'move';
+        return;
+      }
     }
-    canvas.style.cursor = this._partAt(point) ? 'move' : 'crosshair';
+    canvas.style.cursor = this.tool === 'draw' ? 'crosshair' : 'default';
   }
 
   _resized(origin, handle, image) {
@@ -422,29 +711,33 @@ export class Annotator {
 
     window.addEventListener('keydown', (event) => {
       if (event.code === 'Space' && !typing(event.target)) {
-        this.spaceDown = true;
-        this.host.classList.add('is-pannable');
+        if (!this.spaceDown) {
+          this.spaceDown = true;
+          this.host.classList.add('is-pannable');
+          this._applyCursor();
+        }
         event.preventDefault();
       }
       if (!this.isActive || !this.isActive()) return;
       if (typing(event.target)) return;
 
       const key = event.key.toLowerCase();
+      const accel = event.ctrlKey || event.metaKey;
 
-      if ((event.ctrlKey || event.metaKey) && key === 'z') {
+      if (accel && key === 'z') {
         event.preventDefault();
         if (event.shiftKey) this.redo();
         else this.undo();
         return;
       }
-      if ((event.ctrlKey || event.metaKey) && key === 'y') {
+      if (accel && key === 'y') { event.preventDefault(); this.redo(); return; }
+      if (accel && key === 'a') { event.preventDefault(); this.selectAll(); return; }
+      if (accel && key === 'd') { event.preventDefault(); this.duplicateSelected(); return; }
+
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        if (!this.selectedIds.size) return;
         event.preventDefault();
-        this.redo();
-        return;
-      }
-      if ((event.key === 'Delete' || event.key === 'Backspace') && this.selectedId) {
-        event.preventDefault();
-        this.deletePart(this.selectedId);
+        this.deleteSelected();
         return;
       }
       if (event.key === 'F2' && this.selectedId) {
@@ -452,29 +745,40 @@ export class Annotator {
         this.onRenameRequest(this.selectedId);
         return;
       }
-      if (event.key === 'Escape' && this.selectedId) {
-        this.select(null);
+      if (event.key === 'Escape') {
+        if (this.selectedIds.size) this.select(null);
         return;
       }
+
+      if (key === 'v') { this.setTool('select'); return; }
+      if (key === 'r') { this.setTool('draw'); return; }
+
+      if (event.shiftKey && key === '!') { this.view.fit(24, { animate: true }); return; }
+      if (event.shiftKey && key === '@') { this.zoomToSelection(); return; }
+      if (event.shiftKey && key === ')') { this.view.zoomTo(1); return; }
+      if (key === '1' && event.shiftKey) { this.view.fit(24, { animate: true }); return; }
+      if (key === '2' && event.shiftKey) { this.zoomToSelection(); return; }
+      if (key === '0' && event.shiftKey) { this.view.zoomTo(1); return; }
       if (key === '+' || key === '=') { this.view.zoomBy(1.25); return; }
       if (key === '-') { this.view.zoomBy(0.8); return; }
-      if (key === '0') { this.view.fit(); return; }
+      if (key === '0') { this.view.fit(24, { animate: true }); return; }
 
-      // Arrow keys nudge the selected box, which is the only practical way to
+      // Arrow keys nudge the selection, which is the only practical way to
       // place a box exactly on a 20 px passive.
-      if (this.selectedId && event.key.startsWith('Arrow')) {
+      if (this.selectedIds.size && event.key.startsWith('Arrow')) {
         event.preventDefault();
-        const part = this.parts.find((p) => p.id === this.selectedId);
-        if (!part) return;
         const step = event.shiftKey ? 10 : 1;
         const delta = {
           ArrowLeft: [-step, 0], ArrowRight: [step, 0],
           ArrowUp: [0, -step], ArrowDown: [0, step],
         }[event.key];
         this._snapshot();
-        part.bbox = this._clampBox([
-          part.bbox[0] + delta[0], part.bbox[1] + delta[1], part.bbox[2], part.bbox[3],
-        ]);
+        for (const part of this.parts) {
+          if (!this.selectedIds.has(part.id)) continue;
+          part.bbox = this._clampBox([
+            part.bbox[0] + delta[0], part.bbox[1] + delta[1], part.bbox[2], part.bbox[3],
+          ]);
+        }
         this._emit();
       }
     });
@@ -483,6 +787,7 @@ export class Annotator {
       if (event.code === 'Space') {
         this.spaceDown = false;
         this.host.classList.remove('is-pannable');
+        this._applyCursor();
       }
     });
   }
@@ -513,29 +818,71 @@ export class Annotator {
     );
 
     const brand = cssVar('--brand', '#6e8bff');
+    const accent = cssVar('--brand-alt', '#a78bfa');
     const ok = cssVar('--ok', '#2bd47d');
 
     for (const part of this.parts) {
       const rect = this._screenRect(part);
-      const selected = part.id === this.selectedId;
+      const selected = this.selectedIds.has(part.id);
+      const hovered = this.hoveredId === part.id && !selected;
       const colour = selected ? brand : ok;
 
       ctx.save();
       roundedRectPath(ctx, rect.x, rect.y, rect.w, rect.h, 3);
-      ctx.fillStyle = selected ? 'rgba(110,139,255,0.17)' : 'rgba(43,212,125,0.10)';
+      ctx.fillStyle = selected
+        ? 'rgba(110,139,255,0.17)'
+        : hovered ? 'rgba(43,212,125,0.18)' : 'rgba(43,212,125,0.10)';
       ctx.fill();
-      ctx.lineWidth = selected ? 2 : 1.4;
+      ctx.lineWidth = selected ? 2 : hovered ? 1.8 : 1.4;
       ctx.strokeStyle = colour;
       ctx.stroke();
       ctx.restore();
 
-      if (rect.w > 26 || selected) {
+      if (rect.w > 26 || selected || hovered) {
         drawLabel(ctx, part.name || 'Unnamed', rect.x, rect.y, colour, {
           canvasWidth: this.view.width,
         });
       }
+    }
 
-      if (selected) this._drawHandles(ctx, rect, brand);
+    // Handles only for a single selection; for several, outline the group.
+    if (this.selectedIds.size === 1) {
+      const part = this.parts.find((p) => p.id === this.selectedId);
+      if (part) this._drawHandles(ctx, this._screenRect(part), brand);
+    } else if (this.selectedIds.size > 1) {
+      const box = this._selectionBounds();
+      if (box) {
+        const topLeft = this.view.toScreen(box.x, box.y);
+        ctx.save();
+        ctx.setLineDash([4, 4]);
+        ctx.lineWidth = 1.4;
+        ctx.strokeStyle = brand;
+        ctx.strokeRect(
+          topLeft.x - 3, topLeft.y - 3,
+          box.w * scale + 6, box.h * scale + 6,
+        );
+        ctx.restore();
+      }
+    }
+
+    // Snap guides.
+    for (const guide of this.guides) {
+      ctx.save();
+      ctx.setLineDash([3, 4]);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = accent;
+      ctx.beginPath();
+      if (guide.axis === 'v') {
+        const x = this.view.toScreen(guide.at, 0).x;
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, this.view.height);
+      } else {
+        const y = this.view.toScreen(0, guide.at).y;
+        ctx.moveTo(0, y);
+        ctx.lineTo(this.view.width, y);
+      }
+      ctx.stroke();
+      ctx.restore();
     }
 
     if (this.draft) {
@@ -550,6 +897,19 @@ export class Annotator {
       const y = Math.min(a.y, b.y);
       ctx.fillRect(x, y, Math.abs(b.x - a.x), Math.abs(b.y - a.y));
       ctx.strokeRect(x, y, Math.abs(b.x - a.x), Math.abs(b.y - a.y));
+      ctx.restore();
+    }
+
+    if (this.marquee) {
+      const { x0, y0, x1, y1 } = this.marquee;
+      ctx.save();
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = brand;
+      ctx.fillStyle = 'rgba(110,139,255,0.10)';
+      const x = Math.min(x0, x1);
+      const y = Math.min(y0, y1);
+      ctx.fillRect(x, y, Math.abs(x1 - x0), Math.abs(y1 - y0));
+      ctx.strokeRect(x, y, Math.abs(x1 - x0), Math.abs(y1 - y0));
       ctx.restore();
     }
 

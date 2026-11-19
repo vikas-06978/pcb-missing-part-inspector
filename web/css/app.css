@@ -643,16 +643,138 @@ u { text-decoration-color: var(--brand-line); text-underline-offset: 3px; }
   color: var(--text-dim);
   font-size: 0.78rem;
   text-align: center;
+  white-space: nowrap;
 }
-@media (max-width: 820px) { .stage-hint { display: none; } }
+/* The hint is a courtesy, not information the user needs twice. Drop it
+   before it is allowed to wrap and push the canvas down. */
+@media (max-width: 1240px) { .stage-hint { display: none; } }
 
 .zoom-readout {
-  min-width: 48px;
+  min-width: 54px;
+  padding: 5px 4px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: none;
   text-align: center;
   font-size: 0.76rem;
   font-variant-numeric: tabular-nums;
   color: var(--text-mid);
+  transition: background 0.14s var(--ease), color 0.14s var(--ease);
 }
+.zoom-readout:hover { background: var(--surface-3); color: var(--text); }
+
+.tool-icon {
+  width: 15px; height: 15px;
+  fill: none; stroke: currentColor;
+  stroke-width: 1.7; stroke-linejoin: round;
+}
+#tool-switch button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+#tool-switch button[data-tool="select"] .tool-icon { fill: currentColor; stroke-width: 1.2; }
+
+.tool-sep {
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  background: var(--border);
+}
+
+/* --------------------------------------------------------------------------
+   First-run guided tour
+   -------------------------------------------------------------------------- */
+
+.tour-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(4, 7, 12, 0.55);
+  backdrop-filter: blur(2px);
+  animation: fade-in 0.25s var(--ease-out);
+}
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+.tour-spot {
+  position: fixed;
+  z-index: 71;
+  border-radius: 14px;
+  border: 2px solid var(--brand);
+  box-shadow: 0 0 0 9999px rgba(4, 7, 12, 0.55), 0 0 32px -4px var(--brand);
+  pointer-events: none;
+  transition: all 0.32s var(--ease-out);
+}
+
+.tour-card {
+  position: fixed;
+  z-index: 72;
+  width: min(360px, calc(100vw - 32px));
+  padding: 18px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-str);
+  background: var(--surface-up);
+  box-shadow: var(--shadow-3);
+  transition: top 0.32s var(--ease-out), left 0.32s var(--ease-out);
+}
+.tour-card__step {
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brand);
+  font-weight: 650;
+}
+.tour-card h3 { margin: 6px 0 7px; font-size: 1.05rem; }
+.tour-card p { color: var(--text-mid); font-size: 0.875rem; line-height: 1.55; }
+.tour-card__foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+.tour-card__dots { display: flex; gap: 5px; margin-right: auto; }
+.tour-card__dots i {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--border-str);
+  transition: background 0.2s var(--ease), width 0.2s var(--ease);
+}
+.tour-card__dots i.is-on { background: var(--brand); width: 16px; border-radius: 3px; }
+
+/* --------------------------------------------------------------------------
+   Inline help
+   -------------------------------------------------------------------------- */
+
+.help-strip {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 12px 15px;
+  margin-bottom: 18px;
+  border-radius: var(--radius);
+  border: 1px solid var(--brand-line);
+  background: var(--brand-soft);
+}
+.help-strip svg {
+  width: 17px; height: 17px;
+  flex: none;
+  margin-top: 1px;
+  fill: none; stroke: var(--brand);
+  stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round;
+}
+.help-strip__text { font-size: 0.855rem; color: var(--text-mid); line-height: 1.55; }
+.help-strip__text b { color: var(--text); font-weight: 620; }
+.help-strip__close {
+  margin-left: auto;
+  flex: none;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  padding: 2px 4px;
+  border-radius: 6px;
+}
+.help-strip__close:hover { color: var(--text); background: var(--surface-2); }
 
 .canvas-host {
   position: relative;

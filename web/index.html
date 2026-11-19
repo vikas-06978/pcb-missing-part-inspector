@@ -77,7 +77,8 @@
         <div class="menu__sep"></div>
         <button data-action="clear-runs" role="menuitem">Clear inspection history</button>
         <div class="menu__sep"></div>
-        <button data-action="about" role="menuitem">About &amp; shortcuts</button>
+        <button data-action="tour" role="menuitem">Show the guided tour</button>
+        <button data-action="about" role="menuitem">How it works &amp; shortcuts</button>
       </div>
     </div>
   </div>
@@ -159,20 +160,37 @@
     <div class="editor">
       <div class="editor__stage">
         <div class="stage-toolbar">
+          <div class="segmented" id="tool-switch" role="group" aria-label="Canvas tool">
+            <button data-tool="draw" class="is-active" type="button" title="Draw parts (R)">
+              <svg viewBox="0 0 24 24" class="tool-icon" aria-hidden="true"><rect x="4.5" y="6.5" width="15" height="11" rx="2"/><path d="M4.5 12h15M12 6.5v11" opacity=".45"/></svg>
+              Draw
+            </button>
+            <button data-tool="select" type="button" title="Select and move (V)">
+              <svg viewBox="0 0 24 24" class="tool-icon" aria-hidden="true"><path d="M6 4l12 7.2-5.3 1.3L10.4 18z"/></svg>
+              Select
+            </button>
+          </div>
+
+          <p class="stage-hint">
+            Drag to add a part &middot; scroll to pan &middot;
+            <kbd>Ctrl</kbd>+scroll to zoom &middot; double-click to rename
+          </p>
+
           <div class="toolgroup">
             <button class="icon-btn icon-btn--sm" id="zoom-out" type="button" title="Zoom out (−)" aria-label="Zoom out">
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.4"/><path d="M8.2 11h5.6M20 20l-4.4-4.4"/></svg>
             </button>
-            <span class="zoom-readout" id="zoom-readout">100%</span>
+            <button class="zoom-readout" id="zoom-readout" type="button" title="Reset to 100% (Shift+0)">100%</button>
             <button class="icon-btn icon-btn--sm" id="zoom-in" type="button" title="Zoom in (+)" aria-label="Zoom in">
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.4"/><path d="M8.2 11h5.6M11 8.2v5.6M20 20l-4.4-4.4"/></svg>
             </button>
-            <button class="icon-btn icon-btn--sm" id="zoom-fit" type="button" title="Fit to window (0)" aria-label="Fit to window">
+            <button class="icon-btn icon-btn--sm" id="zoom-fit" type="button" title="Fit to window (Shift+1)" aria-label="Fit to window">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
             </button>
-          </div>
-          <p class="stage-hint">Drag on the board to add a part &middot; double-click a box to rename &middot; <kbd>Del</kbd> removes</p>
-          <div class="toolgroup">
+            <button class="icon-btn icon-btn--sm" id="zoom-selection" type="button" title="Zoom to selection (Shift+2)" aria-label="Zoom to selection">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2.5"/><rect x="9.5" y="9.5" width="5" height="5" rx="1"/></svg>
+            </button>
+            <span class="tool-sep" aria-hidden="true"></span>
             <button class="btn btn--ghost btn--sm" id="clear-parts" type="button">Clear all</button>
           </div>
         </div>
@@ -298,15 +316,25 @@
     <li>Measures six independent signals inside each named box.</li>
     <li>Fuses them into one confidence, then applies presence vetoes.</li>
   </ol>
-  <h3>Keyboard</h3>
+  <h3>Moving around the board</h3>
   <table class="sheet__keys">
-    <tr><td><kbd>Del</kbd></td><td>Delete the selected part</td></tr>
-    <tr><td><kbd>F2</kbd></td><td>Rename the selected part</td></tr>
-    <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>Undo</td></tr>
-    <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td><td>Redo</td></tr>
-    <tr><td><kbd>+</kbd> <kbd>−</kbd> <kbd>0</kbd></td><td>Zoom in, out, fit</td></tr>
-    <tr><td><kbd>Space</kbd>+drag</td><td>Pan the board</td></tr>
-    <tr><td><kbd>Esc</kbd></td><td>Deselect or close</td></tr>
+    <tr><td>Scroll / two-finger drag</td><td>Pan</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+scroll, pinch</td><td>Zoom where the pointer is</td></tr>
+    <tr><td><kbd>Space</kbd>+drag, middle-drag</td><td>Pan</td></tr>
+    <tr><td><kbd>Shift</kbd>+<kbd>1</kbd> / <kbd>2</kbd> / <kbd>0</kbd></td><td>Fit, zoom to selection, 100%</td></tr>
+  </table>
+
+  <h3>Working with parts</h3>
+  <table class="sheet__keys">
+    <tr><td><kbd>R</kbd> / <kbd>V</kbd></td><td>Draw tool / select tool</td></tr>
+    <tr><td>Drag on empty board</td><td>New part (draw tool), marquee (select tool)</td></tr>
+    <tr><td><kbd>Shift</kbd>+click</td><td>Add or remove from the selection</td></tr>
+    <tr><td><kbd>Alt</kbd>+drag</td><td>Duplicate as you drag</td></tr>
+    <tr><td>Double-click, <kbd>F2</kbd></td><td>Rename</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd> / <kbd>D</kbd></td><td>Select all / duplicate</td></tr>
+    <tr><td>Arrows, <kbd>Shift</kbd>+arrows</td><td>Nudge 1 px / 10 px</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Shift</kbd>+<kbd>Z</kbd></td><td>Undo / redo</td></tr>
+    <tr><td><kbd>Del</kbd> &middot; <kbd>Esc</kbd></td><td>Delete selection &middot; deselect</td></tr>
   </table>
   <div class="row row--end">
     <button class="btn btn--primary" data-close type="button">Close</button>

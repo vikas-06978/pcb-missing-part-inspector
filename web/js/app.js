@@ -15,6 +15,9 @@ import { Annotator } from './annotator.js';
 import {
   DetailView, renderBatchSummary, renderCards, buildReport,
 } from './results.js';
+import {
+  WELCOME_STEPS, markTourSeen, runTour, showHelpStrip, tourSeen,
+} from './tour.js';
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -84,6 +87,16 @@ function goTo(step) {
       state.annotator?.view.resize();
       state.annotator?.view.fit();
     });
+    // Explained in place rather than in a modal: a dialog in the middle of the
+    // annotation screen would cover the thing it is describing.
+    showHelpStrip(
+      $('#step-parts'),
+      'canvas',
+      '<b>Drag a box</b> around a component, then type its name on the right. '
+      + '<b>Scroll</b> to move around and <b>Ctrl</b>+scroll to zoom, exactly '
+      + 'like a design tool. Boxes snap to each other as you drag, and '
+      + '<b>Ctrl</b>+<b>Z</b> undoes anything.',
+    );
   }
 }
 
@@ -167,6 +180,11 @@ function createAnnotator() {
       updateZoomReadout();
     },
     onSelect: () => renderPartList(),
+    onToolChange: (tool) => {
+      for (const button of document.querySelectorAll('#tool-switch button')) {
+        button.classList.toggle('is-active', button.dataset.tool === tool);
+      }
+    },
     onRenameRequest: (id) => {
       const input = document.querySelector(`.part-row[data-id="${id}"] .part-row__name`);
       if (input) {
@@ -208,7 +226,7 @@ function renderPartList() {
     const row = document.createElement('li');
     row.className = 'part-row';
     row.dataset.id = part.id;
-    if (part.id === annotator.selectedId) row.classList.add('is-selected');
+    if (annotator.isSelected(part.id)) row.classList.add('is-selected');
 
     row.innerHTML = `
       <span class="part-row__index">${index + 1}</span>
@@ -235,6 +253,12 @@ function renderPartList() {
     row.addEventListener('click', (event) => {
       if (event.target.closest('.part-row__del')) return;
       if (event.target === input) return;
+      // Shift / ctrl-click extends the selection, matching the canvas and
+      // every file list the operator has ever used.
+      if (event.shiftKey || event.metaKey || event.ctrlKey) {
+        annotator.select(part.id, { additive: true });
+        return;
+      }
       annotator.focusPart(part.id);
     });
 
@@ -539,6 +563,12 @@ function wireMenu() {
     }
 
     if (action === 'about') $('#about').showModal();
+
+    if (action === 'tour') {
+      goTo('reference');
+      await runTour(WELCOME_STEPS);
+      markTourSeen();
+    }
   });
 
   $('#about').querySelector('[data-close]').addEventListener('click', () => $('#about').close());
@@ -611,7 +641,14 @@ async function main() {
 
   $('#zoom-in').addEventListener('click', () => state.annotator?.view.zoomBy(1.25));
   $('#zoom-out').addEventListener('click', () => state.annotator?.view.zoomBy(0.8));
-  $('#zoom-fit').addEventListener('click', () => state.annotator?.view.fit());
+  $('#zoom-fit').addEventListener('click', () => state.annotator?.view.fit(24, { animate: true }));
+  $('#zoom-readout').addEventListener('click', () => state.annotator?.view.zoomTo(1));
+  $('#zoom-selection').addEventListener('click', () => state.annotator?.zoomToSelection());
+
+  $('#tool-switch').addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-tool]');
+    if (button) state.annotator?.setTool(button.dataset.tool);
+  });
 
   $('#suggest-parts').addEventListener('click', suggestParts);
   $('#rename-all').addEventListener('click', () => state.annotator?.autoName());
@@ -665,6 +702,16 @@ async function main() {
     }
   } catch (error) {
     if (error instanceof ApiError) toast('Could not load the project', error.message, 'error');
+  }
+
+  // Only on a genuinely fresh start. Someone returning to a configured board
+  // does not need to be told what the app is.
+  if (!tourSeen() && !state.project?.reference) {
+    // One frame so the layout has settled and the spotlight lands correctly.
+    requestAnimationFrame(async () => {
+      await runTour(WELCOME_STEPS);
+      markTourSeen();
+    });
   }
 }
 

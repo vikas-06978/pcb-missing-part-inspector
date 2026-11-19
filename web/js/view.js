@@ -26,6 +26,9 @@ export class CanvasView {
     this.width = 0;   // CSS pixels
     this.height = 0;
 
+    this._animation = null;
+    this.userMoved = false;
+
     this.onChange = () => {};
 
     this._observer = new ResizeObserver(() => this.resize());
@@ -34,7 +37,64 @@ export class CanvasView {
   }
 
   destroy() {
+    this.cancelAnimation();
     this._observer.disconnect();
+  }
+
+  // ---- animation ---------------------------------------------------------
+
+  cancelAnimation() {
+    if (this._animation) {
+      cancelAnimationFrame(this._animation);
+      this._animation = null;
+    }
+  }
+
+  /**
+   * Ease the viewport to a target transform.
+   *
+   * Jumping the canvas instantly loses the reader: after "zoom to fit" or
+   * clicking a part in the list, you have to re-find where you were. A short
+   * eased move keeps the board's identity continuous, which is why every
+   * design tool does it.
+   */
+  animateTo(scale, tx, ty, duration = 300) {
+    this.cancelAnimation();
+
+    const fromScale = this.scale;
+    const fromTx = this.tx;
+    const fromTy = this.ty;
+
+    // Nothing meaningful to animate: just set it.
+    if (
+      Math.abs(fromScale - scale) < 1e-4 &&
+      Math.abs(fromTx - tx) < 0.5 &&
+      Math.abs(fromTy - ty) < 0.5
+    ) {
+      return;
+    }
+
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced || duration <= 0) {
+      this.scale = scale;
+      this.tx = tx;
+      this.ty = ty;
+      this.onChange();
+      return;
+    }
+
+    const start = performance.now();
+    const step = (now) => {
+      const t = Math.min(1, (now - start) / duration);
+      // easeOutCubic: fast commit, gentle settle.
+      const e = 1 - Math.pow(1 - t, 3);
+      this.scale = fromScale + (scale - fromScale) * e;
+      this.tx = fromTx + (tx - fromTx) * e;
+      this.ty = fromTy + (ty - fromTy) * e;
+      this.onChange();
+      this._animation = t < 1 ? requestAnimationFrame(step) : null;
+    };
+    this._animation = requestAnimationFrame(step);
   }
 
   /** Match the backing store to the element size and the pixel ratio. */
@@ -52,7 +112,13 @@ export class CanvasView {
     this.canvas.style.height = `${rect.height}px`;
 
     this.ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-    this.onChange();
+
+    // Until the user has panned or zoomed themselves, keep the whole board in
+    // view as the panel resizes. Without this, anything that changes the
+    // layout after the first fit -- a help note appearing, the window being
+    // resized -- silently leaves the board cropped.
+    if (!this.userMoved && this.contentWidth) this.fit();
+    else this.onChange();
   }
 
   setContent(width, height) {
@@ -61,15 +127,75 @@ export class CanvasView {
   }
 
   /** Scale the content to fit, centred, with a little breathing room. */
-  fit(padding = 24) {
+  fit(padding = 24, { animate = false } = {}) {
     if (!this.contentWidth || !this.contentHeight || !this.width) return;
-    const scale = Math.min(
-      (this.width - padding * 2) / this.contentWidth,
-      (this.height - padding * 2) / this.contentHeight,
+    const scale = Math.max(
+      Math.min(
+        (this.width - padding * 2) / this.contentWidth,
+        (this.height - padding * 2) / this.contentHeight,
+      ),
+      this.minScale,
     );
-    this.scale = Math.max(scale, this.minScale);
-    this.tx = (this.width - this.contentWidth * this.scale) / 2;
-    this.ty = (this.height - this.contentHeight * this.scale) / 2;
+    const tx = (this.width - this.contentWidth * scale) / 2;
+    const ty = (this.height - this.contentHeight * scale) / 2;
+    this.userMoved = false;
+
+    if (animate) {
+      this.animateTo(scale, tx, ty);
+      return;
+    }
+    this.cancelAnimation();
+    this.scale = scale;
+    this.tx = tx;
+    this.ty = ty;
+    this.onChange();
+  }
+
+  /** Zoom to an exact factor about the viewport centre. */
+  zoomTo(scale, { animate = true } = {}) {
+    this.userMoved = true;
+    const next = Math.min(this.maxScale, Math.max(this.minScale, scale));
+    const cx = this.width / 2;
+    const cy = this.height / 2;
+    const point = this.toImage(cx, cy);
+    const tx = cx - point.x * next;
+    const ty = cy - point.y * next;
+    if (animate) {
+      this.animateTo(next, tx, ty);
+      return;
+    }
+    this.cancelAnimation();
+    this.scale = next;
+    this.tx = tx;
+    this.ty = ty;
+    this.onChange();
+  }
+
+  /** Frame an arbitrary image-space rectangle, like Figma's zoom-to-selection. */
+  zoomToRect(x, y, width, height, { padding = 80, animate = true, maxScale = 8 } = {}) {
+    this.userMoved = true;
+    if (!this.width || width <= 0 || height <= 0) return;
+    const scale = Math.min(
+      this.maxScale,
+      Math.max(
+        this.minScale,
+        Math.min(
+          (this.width - padding * 2) / width,
+          (this.height - padding * 2) / height,
+          maxScale,
+        ),
+      ),
+    );
+    const tx = this.width / 2 - (x + width / 2) * scale;
+    const ty = this.height / 2 - (y + height / 2) * scale;
+    if (animate) {
+      this.animateTo(scale, tx, ty);
+      return;
+    }
+    this.cancelAnimation();
+    this.scale = scale;
+    this.tx = tx;
+    this.ty = ty;
     this.onChange();
   }
 
@@ -83,8 +209,10 @@ export class CanvasView {
 
   /** Zoom about a screen point, so the pixel under the cursor stays put. */
   zoomAt(factor, screenX, screenY) {
+    this.userMoved = true;
     const next = Math.min(this.maxScale, Math.max(this.minScale, this.scale * factor));
     if (next === this.scale) return;
+    this.cancelAnimation();
     const before = this.toImage(screenX, screenY);
     this.scale = next;
     this.tx = screenX - before.x * this.scale;
@@ -93,26 +221,20 @@ export class CanvasView {
   }
 
   zoomBy(factor) {
-    this.zoomAt(factor, this.width / 2, this.height / 2);
+    this.zoomTo(this.scale * factor);
   }
 
   panBy(dx, dy) {
+    this.userMoved = true;
+    this.cancelAnimation();
     this.tx += dx;
     this.ty += dy;
     this.onChange();
   }
 
   /** Centre a region of the image, zooming in if it is very small. */
-  focusOn(x, y, width, height, padding = 110) {
-    if (!this.width) return;
-    const scale = Math.min(
-      (this.width - padding * 2) / Math.max(width, 1),
-      (this.height - padding * 2) / Math.max(height, 1),
-    );
-    this.scale = Math.min(this.maxScale, Math.max(this.minScale, Math.min(scale, 7)));
-    this.tx = this.width / 2 - (x + width / 2) * this.scale;
-    this.ty = this.height / 2 - (y + height / 2) * this.scale;
-    this.onChange();
+  focusOn(x, y, width, height, padding = 110, { animate = true } = {}) {
+    this.zoomToRect(x, y, width, height, { padding, animate, maxScale: 7 });
   }
 
   /** Pointer position in CSS pixels relative to the canvas. */

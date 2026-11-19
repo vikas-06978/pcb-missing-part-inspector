@@ -61,8 +61,8 @@ camera at anything.
    any you care about, or just continue. (You can also drag boxes by hand —
    that is the normal way.)
 4. **Step 3** — drop in several files from `samples/boards/`, for example
-   `board_01_ok_clean.jpg`, `board_06_missing_three.jpg` and
-   `board_10_missing_mixed.jpg`.
+   `board_01_ok_clean.jpg`, `board_11_missing_metal.jpg` and
+   `board_12_missing_lookalike.jpg`.
 
 The first comes back **OK**; the others name exactly the parts that were
 removed. `samples/ground_truth.json` lists the right answer for every file.
@@ -104,20 +104,20 @@ survives a board nobody has seen before.
 ## Measured results
 
 Against the generated benchmark — 80 board photographs spanning the full
-nuisance range, 24 named parts each, **1,920 individual part decisions**:
+nuisance range, **41 named parts** each, **3,280 individual part decisions**:
 
 | Sensitivity | Precision | Recall | False alarms | Missed removals | Boards exactly right |
 |---|---|---|---|---|---|
 | Conservative | 100% | 100% | 0 | 0 | 80 / 80 |
 | **Balanced** (default) | **100%** | **100%** | **0** | **0** | **80 / 80** |
-| Sensitive | 99.4% | 100% | 1 | 0 | 80 / 80 |
+| Sensitive | 100% | 100% | 0 | 0 | 80 / 80 |
 
 The margin matters more than the score: the highest-scoring part that is
-actually *present* reaches 0.247, and the weakest genuine removal reaches
-0.424. Every threshold in that gap scores perfectly, so the presets sit inside
+actually *present* reaches 0.373, and the weakest genuine removal reaches
+0.652. Every threshold in that gap scores perfectly, so the presets sit inside
 it rather than balanced on an edge.
 
-About **0.7 s per board** for 24 parts on a laptop CPU.
+About **0.9 s per board** for 41 parts on a laptop CPU.
 
 > **Read this honestly.** The benchmark is rendered, not photographed. Real
 > boards glint, sit at slight angles, and collect dust. These numbers are
@@ -127,7 +127,7 @@ About **0.7 s per board** for 24 parts on a laptop CPU.
 ### Reproduce it
 
 ```bash
-python tools/generate_samples.py                              # the 10 shipped boards
+python tools/generate_samples.py                              # the 12 shipped boards
 python tools/evaluate.py --all-presets                        # score them
 
 python tools/generate_samples.py --stress 80 --out samples_stress
@@ -156,9 +156,9 @@ you when alignment was poor rather than guessing.
 
 | Preset | Flags at | Use when |
 |---|---|---|
-| Conservative | 0.40 | False alarms are expensive; you want certainty |
-| Balanced | 0.34 | Default — fixed camera, stable line |
-| Sensitive | 0.28 | You would rather check a few extra boards by hand |
+| Conservative | 0.58 | False alarms are expensive; you want certainty |
+| Balanced | 0.52 | Default — fixed camera, stable line |
+| Sensitive | 0.44 | You would rather check a few extra boards by hand |
 
 Parts between the two thresholds are marked **needs review** in amber rather
 than being silently called either way.
@@ -166,13 +166,37 @@ than being silently called either way.
 ### Other things it does
 
 - **Auto-detect** proposes a box per component so you are renaming rather than
-  drawing. It is an assistant: edit, delete and add freely.
+  drawing. On the sample board it finds 40 of the 41 parts. It is an
+  assistant: edit, delete and add freely.
 - **Export / import setup** saves the reference photo and every named part to
   one `.json` file, so a configured board moves between machines.
 - **Export report** writes a self-contained HTML file with the images embedded
   — readable on any machine, with no server and no application.
-- Light and dark themes; full keyboard control (`Del`, `F2`, `Ctrl+Z`, arrows
-  to nudge, wheel to zoom, space-drag to pan).
+- Light and dark themes, and a **guided tour on first run** — reopen it any
+  time from the menu.
+
+### The board canvas
+
+It behaves like a design tool, because that is what everyone's fingers already
+know:
+
+| | |
+|---|---|
+| Scroll, two-finger drag | Pan |
+| `Ctrl`/`Cmd` + scroll, pinch | Zoom where the pointer is |
+| `Space` + drag, middle-drag | Pan |
+| `R` / `V` | Draw tool / select tool |
+| Drag on empty board | New part (draw), marquee select (select) |
+| `Shift` + click | Add to or remove from the selection |
+| `Alt` + drag | Duplicate as you drag |
+| Double-click, `F2` | Rename |
+| `Ctrl`+`A` / `Ctrl`+`D` | Select all / duplicate |
+| Arrows, `Shift`+arrows | Nudge 1 px / 10 px |
+| `Ctrl`+`Z` / `Ctrl`+`Shift`+`Z` | Undo / redo |
+| `Shift`+`1` / `2` / `0` | Fit, zoom to selection, 100% |
+
+Boxes snap to their neighbours' edges and centres as you drag, with guides, so
+a row of passives lines up without fighting the mouse.
 
 ---
 
@@ -216,7 +240,7 @@ web/                  the interface: one HTML file, one stylesheet, ES modules
 tools/
   generate_samples.py renders the benchmark boards
   evaluate.py         scores the engine against ground truth
-samples/              10 boards + ground truth, committed so it runs immediately
+samples/              12 boards + ground truth, committed so it runs immediately
 data/                 created at runtime; your projects and inspections
 ```
 

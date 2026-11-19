@@ -2,46 +2,16 @@
   "generator": "tools/generate_samples.py",
   "seed": 20261119,
   "board_size": [
-    1120,
-    760
+    1400,
+    820
   ],
   "reference": "boards/golden.png",
   "parts": [
     {
-      "name": "U1",
-      "kind": "ic",
-      "bbox": [
-        210,
-        250,
-        176,
-        176
-      ]
-    },
-    {
-      "name": "U2",
-      "kind": "ic",
-      "bbox": [
-        520,
-        300,
-        104,
-        104
-      ]
-    },
-    {
-      "name": "U3",
-      "kind": "ic",
-      "bbox": [
-        760,
-        232,
-        86,
-        64
-      ]
-    },
-    {
       "name": "J1",
       "kind": "connector",
       "bbox": [
-        180,
+        120,
         92,
         300,
         74
@@ -51,200 +21,400 @@
       "name": "J2",
       "kind": "header",
       "bbox": [
-        700,
+        470,
         96,
         150,
         54
       ]
     },
     {
-      "name": "C1",
-      "kind": "electrolytic",
-      "bbox": [
-        540,
-        520,
-        96,
-        96
-      ]
-    },
-    {
-      "name": "C2",
-      "kind": "electrolytic",
+      "name": "J3",
+      "kind": "shield",
       "bbox": [
         680,
-        520,
+        90,
+        120,
+        64
+      ]
+    },
+    {
+      "name": "J4",
+      "kind": "header",
+      "bbox": [
+        860,
         96,
-        96
+        120,
+        54
       ]
     },
     {
-      "name": "C3",
-      "kind": "tantalum",
+      "name": "SW1",
+      "kind": "button",
       "bbox": [
-        430,
-        540,
-        46,
-        28
+        1040,
+        90,
+        58,
+        58
       ]
     },
     {
-      "name": "C4",
-      "kind": "mlcc",
-      "bbox": [
-        430,
-        596,
-        38,
-        24
-      ]
-    },
-    {
-      "name": "C5",
-      "kind": "mlcc",
-      "bbox": [
-        430,
-        640,
-        38,
-        24
-      ]
-    },
-    {
-      "name": "C6",
-      "kind": "mlcc",
-      "bbox": [
-        214,
-        470,
-        34,
-        22
-      ]
-    },
-    {
-      "name": "C7",
-      "kind": "mlcc",
-      "bbox": [
-        268,
-        470,
-        34,
-        22
-      ]
-    },
-    {
-      "name": "C8",
-      "kind": "mlcc",
-      "bbox": [
-        322,
-        470,
-        34,
-        22
-      ]
-    },
-    {
-      "name": "R1",
+      "name": "F1",
       "kind": "resistor",
       "bbox": [
-        214,
-        520,
-        40,
-        22
+        1160,
+        100,
+        56,
+        26
       ]
     },
     {
-      "name": "R2",
-      "kind": "resistor",
+      "name": "U1",
+      "kind": "ic",
       "bbox": [
-        214,
-        560,
-        40,
-        22
-      ]
-    },
-    {
-      "name": "R3",
-      "kind": "resistor",
-      "bbox": [
-        214,
-        600,
-        40,
-        22
-      ]
-    },
-    {
-      "name": "R4",
-      "kind": "resistor",
-      "bbox": [
-        300,
-        520,
-        40,
-        22
-      ]
-    },
-    {
-      "name": "R5",
-      "kind": "resistor",
-      "bbox": [
-        300,
-        560,
-        40,
-        22
-      ]
-    },
-    {
-      "name": "R6",
-      "kind": "resistor",
-      "bbox": [
-        876,
-        470,
-        22,
-        40
+        120,
+        250,
+        176,
+        176
       ]
     },
     {
       "name": "Y1",
       "kind": "crystal",
       "bbox": [
-        430,
-        300,
-        72,
-        40
+        340,
+        250,
+        76,
+        42
+      ]
+    },
+    {
+      "name": "U2",
+      "kind": "ic",
+      "bbox": [
+        340,
+        330,
+        108,
+        108
+      ]
+    },
+    {
+      "name": "U3",
+      "kind": "ic",
+      "bbox": [
+        500,
+        250,
+        90,
+        66
+      ]
+    },
+    {
+      "name": "U5",
+      "kind": "ic",
+      "bbox": [
+        500,
+        360,
+        76,
+        76
       ]
     },
     {
       "name": "L1",
       "kind": "inductor",
       "bbox": [
-        660,
-        420,
-        62,
-        52
+        640,
+        250,
+        64,
+        54
       ]
     },
     {
       "name": "D1",
       "kind": "led",
       "bbox": [
-        880,
-        320,
-        30,
-        30
+        640,
+        340,
+        32,
+        32
       ]
     },
     {
       "name": "D2",
       "kind": "led",
       "bbox": [
-        880,
-        376,
-        30,
-        30
+        640,
+        395,
+        32,
+        32
+      ]
+    },
+    {
+      "name": "C1",
+      "kind": "electrolytic",
+      "bbox": [
+        740,
+        250,
+        98,
+        98
+      ]
+    },
+    {
+      "name": "C2",
+      "kind": "electrolytic",
+      "bbox": [
+        860,
+        250,
+        98,
+        98
       ]
     },
     {
       "name": "U4",
       "kind": "ic",
       "bbox": [
-        820,
-        560,
-        92,
+        1000,
+        250,
+        96,
+        76
+      ]
+    },
+    {
+      "name": "U6",
+      "kind": "ic",
+      "bbox": [
+        1000,
+        370,
+        70,
+        56
+      ]
+    },
+    {
+      "name": "K1",
+      "kind": "connector",
+      "bbox": [
+        1160,
+        250,
+        130,
         72
+      ]
+    },
+    {
+      "name": "D3",
+      "kind": "led",
+      "bbox": [
+        1160,
+        360,
+        32,
+        32
+      ]
+    },
+    {
+      "name": "R1",
+      "kind": "resistor",
+      "bbox": [
+        120,
+        500,
+        44,
+        24
+      ]
+    },
+    {
+      "name": "R2",
+      "kind": "resistor",
+      "bbox": [
+        120,
+        545,
+        44,
+        24
+      ]
+    },
+    {
+      "name": "R3",
+      "kind": "resistor",
+      "bbox": [
+        120,
+        590,
+        44,
+        24
+      ]
+    },
+    {
+      "name": "R4",
+      "kind": "resistor",
+      "bbox": [
+        190,
+        500,
+        44,
+        24
+      ]
+    },
+    {
+      "name": "R5",
+      "kind": "resistor",
+      "bbox": [
+        190,
+        545,
+        44,
+        24
+      ]
+    },
+    {
+      "name": "R7",
+      "kind": "resistor",
+      "bbox": [
+        190,
+        590,
+        44,
+        24
+      ]
+    },
+    {
+      "name": "R8",
+      "kind": "resistor",
+      "bbox": [
+        260,
+        500,
+        44,
+        24
+      ]
+    },
+    {
+      "name": "R9",
+      "kind": "resistor",
+      "bbox": [
+        260,
+        545,
+        44,
+        24
+      ]
+    },
+    {
+      "name": "R6",
+      "kind": "resistor",
+      "bbox": [
+        460,
+        500,
+        24,
+        44
+      ]
+    },
+    {
+      "name": "C6",
+      "kind": "mlcc",
+      "bbox": [
+        120,
+        645,
+        40,
+        26
+      ]
+    },
+    {
+      "name": "C7",
+      "kind": "mlcc",
+      "bbox": [
+        176,
+        645,
+        40,
+        26
+      ]
+    },
+    {
+      "name": "C8",
+      "kind": "mlcc",
+      "bbox": [
+        232,
+        645,
+        40,
+        26
+      ]
+    },
+    {
+      "name": "C9",
+      "kind": "mlcc",
+      "bbox": [
+        288,
+        645,
+        40,
+        26
+      ]
+    },
+    {
+      "name": "C4",
+      "kind": "mlcc",
+      "bbox": [
+        120,
+        695,
+        40,
+        26
+      ]
+    },
+    {
+      "name": "C5",
+      "kind": "mlcc",
+      "bbox": [
+        176,
+        695,
+        40,
+        26
+      ]
+    },
+    {
+      "name": "C10",
+      "kind": "mlcc",
+      "bbox": [
+        232,
+        695,
+        40,
+        26
+      ]
+    },
+    {
+      "name": "C11",
+      "kind": "mlcc",
+      "bbox": [
+        288,
+        695,
+        40,
+        26
+      ]
+    },
+    {
+      "name": "C3",
+      "kind": "tantalum",
+      "bbox": [
+        380,
+        500,
+        50,
+        30
+      ]
+    },
+    {
+      "name": "C12",
+      "kind": "tantalum",
+      "bbox": [
+        380,
+        550,
+        50,
+        30
+      ]
+    },
+    {
+      "name": "Q1",
+      "kind": "diode",
+      "bbox": [
+        380,
+        600,
+        42,
+        24
+      ]
+    },
+    {
+      "name": "Q2",
+      "kind": "diode",
+      "bbox": [
+        380,
+        645,
+        42,
+        24
       ]
     }
   ],
@@ -329,6 +499,25 @@
       ],
       "severity": 0.7,
       "note": "Four parts, harsh photo"
+    },
+    {
+      "file": "boards/board_11_missing_metal.jpg",
+      "missing": [
+        "J3",
+        "SW1"
+      ],
+      "severity": 0.5,
+      "note": "Bright metal can and a tactile switch"
+    },
+    {
+      "file": "boards/board_12_missing_lookalike.jpg",
+      "missing": [
+        "R7",
+        "C9",
+        "Q2"
+      ],
+      "severity": 0.65,
+      "note": "Parts from rows of near-identical neighbours"
     }
   ]
 }

@@ -7,7 +7,8 @@ It starts at the very first prompt.
 
 ## How this was built, honestly
 
-I set the objective, the constraints and the quality bar, and handed the
+This document covers twelve decisions. I set the objective, the constraints
+and the quality bar, and handed the
 implementation to Claude (Claude Code, Opus) with an explicit mandate to make
 the technical and design choices itself — my words were *"you to choose
 everything professional from colour to everything"* (excerpt 1).
@@ -216,6 +217,70 @@ silkscreen and traces are thin, component bodies are not, so an opening sized
 to the board deletes the connective tissue.
 
 **Evidence:** same board, **24 of 24**.
+
+---
+
+## Decision 11 — A harder board, and the bug it exposed
+
+**AI suggested**, when asked to make the sample board more complete: add more
+components and move on.
+
+**Decided:** add them, then *re-run the benchmark before believing anything* —
+and treat any drop as a finding, not as noise.
+
+**Why:** the first board had 24 parts of fairly similar character. The new one
+has 41 and is deliberately harder in three specific ways: a 7x range of part
+sizes, a colour range that now includes a bright metal can and a white
+connector rather than only dark parts on green, and rows of near-identical
+passives so template matching cannot rely on a part being locally unique.
+
+The score dropped immediately — and the diagnostic said something precise: a
+small IC that had been **removed outright** still scored 0.74 correlation and
+0.80 edge agreement. The two populations had started to overlap, so no
+threshold could separate them.
+
+**The cause:** an operator's box encloses the component *and* a ring of its
+footprint — solder pads, silkscreen outline, via fanout. That ring is
+identical whether the part is fitted or not. On a large QFP it is a thin
+border; on a small IC it is most of the box, and it was drowning the signal in
+pixels that cannot carry the answer.
+
+**The fix** is one idea, not a tuned constant: measure the *inner* region and
+leave the ring to the alignment search, where its contrast is an asset rather
+than a liability. Same philosophy as Decision 5 — find what the measurement is
+actually looking at.
+
+**Evidence:** the weakest genuine removal went from **0.271 to 0.652** while
+the worst false alarm *fell* from 0.500 to 0.373. On 3,280 part decisions the
+engine now scores 100% precision and 100% recall at **all three** sensitivity
+settings, on a board that is substantially harder than the one it used to
+score 100% on.
+
+---
+
+## Decision 12 — The canvas had to feel like a tool people know
+
+**AI built:** a functional annotation canvas — wheel to zoom, space-drag to
+pan, one box selected at a time.
+
+**Decided:** that is "it works", not "it is good". Rebuild it against the
+conventions of Figma and every map on the web.
+
+**Why:** at the live demo an unfamiliar person annotates an unfamiliar board
+while being watched. Every interaction they have to *discover* is a moment
+where the tool, not the board, is the problem. Scroll-wheel-zoom was the worst
+offender: on a trackpad, two-finger scrolling is pan everywhere else, so the
+original behaviour made the board leap at anyone who touched it.
+
+**What changed:** scroll pans and `Ctrl`+scroll pinch-zooms at the pointer;
+draw and select tools on `R`/`V`; marquee selection; multi-select with
+`Shift`-click; `Alt`-drag to duplicate; alignment guides that snap a box to
+its neighbours' edges and centres; eased transitions for fit and
+zoom-to-selection, so the board never teleports.
+
+**Evidence:** verified by driving the canvas with synthetic pointer events —
+plain scroll leaves the zoom level untouched, `Ctrl`+scroll changes it, a
+marquee across two parts selects exactly two.
 
 ---
 

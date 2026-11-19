@@ -467,4 +467,19 @@ def favicon() -> FileResponse:
     return FileResponse(WEB_DIR / "assets" / "favicon.svg", media_type="image/svg+xml")
 
 
-app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")
+class _NoCacheStatic(StaticFiles):
+    """Serve the front-end without caching.
+
+    This is a local, single-user application that is always served from disk,
+    so there is nothing to gain from caching -- and a great deal to lose. A
+    browser holding a stale app.js after an update produces a UI that is
+    subtly wrong in ways nobody can reproduce.
+    """
+
+    def file_response(self, *args, **kwargs):  # type: ignore[override]
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-store, max-age=0"
+        return response
+
+
+app.mount("/static", _NoCacheStatic(directory=str(WEB_DIR)), name="static")

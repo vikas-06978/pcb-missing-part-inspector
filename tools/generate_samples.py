@@ -273,7 +273,26 @@ def draw_footprint(board: np.ndarray, component: Component) -> None:
                       (x + w + pad_len + 5, y + h + pad_len + 5), SILKSCREEN, 1, cv2.LINE_AA)
         cv2.circle(board, (x - pad_len - 11, y - pad_len - 11), 3, SILKSCREEN, -1, cv2.LINE_AA)
 
-    elif kind in {"mlcc", "resistor", "tantalum", "led", "inductor"}:
+    elif kind == "button":
+        pad = max(7, w // 6)
+        for cx, cy in (
+            (x, y), (x + w, y), (x, y + h), (x + w, y + h),
+        ):
+            cv2.circle(board, (cx, cy), pad, PAD_TIN, -1, cv2.LINE_AA)
+        cv2.rectangle(board, (x - 6, y - 6), (x + w + 6, y + h + 6),
+                      SILKSCREEN, 1, cv2.LINE_AA)
+
+    elif kind == "shield":
+        tab = max(8, h // 5)
+        for cy in (y + h // 4, y + 3 * h // 4):
+            cv2.rectangle(board, (x - 9, cy - tab // 2), (x + 3, cy + tab // 2),
+                          PAD_TIN, -1, cv2.LINE_AA)
+            cv2.rectangle(board, (x + w - 3, cy - tab // 2), (x + w + 9, cy + tab // 2),
+                          PAD_TIN, -1, cv2.LINE_AA)
+        cv2.rectangle(board, (x - 6, y - 6), (x + w + 6, y + h + 6),
+                      SILKSCREEN, 1, cv2.LINE_AA)
+
+    elif kind in {"mlcc", "resistor", "tantalum", "led", "inductor", "diode"}:
         if component.rotation == 90:
             pad_h = max(4, int(h * 0.30))
             cv2.rectangle(board, (x - 2, y - 3), (x + w + 2, y + pad_h), PAD_TIN, -1, cv2.LINE_AA)
@@ -345,6 +364,26 @@ def draw_body(board: np.ndarray, component: Component, rng: np.random.Generator)
         if w > 22 and h > 10:
             body_text(board, component.label or "103", cx, cy, 0.26)
 
+    elif kind == "diode":
+        shaded_body(board, x, y, w, h, (26, 26, 28), radius=2)
+        stripe = max(3, w // 6)
+        cv2.rectangle(board, (x + w - stripe - 1, y + 1), (x + w - 1, y + h - 1),
+                      (218, 222, 226), -1, cv2.LINE_AA)
+
+    elif kind == "button":
+        shaded_body(board, x, y, w, h, (38, 38, 42), radius=3)
+        cx_, cy_ = component.centre
+        cv2.circle(board, (cx_, cy_), max(5, w // 3), (196, 200, 206), -1, cv2.LINE_AA)
+        cv2.circle(board, (cx_, cy_), max(3, w // 5), (150, 154, 160), -1, cv2.LINE_AA)
+
+    elif kind == "shield":
+        shaded_body(board, x, y, w, h, (182, 186, 192), radius=4)
+        cv2.rectangle(board, (x + 5, y + 5), (x + w - 5, y + h - 5),
+                      (150, 154, 160), 1, cv2.LINE_AA)
+        # Stamped slot, the giveaway detail on a real can.
+        cv2.rectangle(board, (x + w // 3, y + h // 2 - 3),
+                      (x + 2 * w // 3, y + h // 2 + 3), (140, 144, 150), -1, cv2.LINE_AA)
+
     elif kind == "tantalum":
         shaded_body(board, x, y, w, h, TANTALUM_BODY, radius=2)
         stripe = max(3, w // 7)
@@ -406,55 +445,105 @@ def draw_body(board: np.ndarray, component: Component, rng: np.random.Generator)
 
 
 def build_layout() -> list[Component]:
-    """A hand-placed, realistic-looking assembly.
+    """A hand-placed, realistic-looking assembly of 41 components.
 
     Hand-placed rather than random so the board reads as a designed product,
-    and so the mix of part sizes is deliberate: the engine has to cope with a
-    170 px QFP and a 16 px chip resistor in the same frame.
+    and so the mix is deliberate. Three properties are being engineered here,
+    because each one is a different way for the inspector to fail:
+
+    * **Size range.** A 176 px QFP and a 24 px chip resistor share one frame,
+      so a single threshold has to work across an 7x span of part sizes.
+    * **Colour range.** Black IC bodies, a bright metal can, white connectors,
+      tan passives and a yellow tantalum. A colour metric that only works on
+      dark-part-on-green-board is not actually working.
+    * **Near-duplicates.** Rows of identical passives sit next to each other,
+      so template matching cannot rely on a part being locally unique.
     """
     components: list[Component] = [
-        Component("U1", "ic", 210, 250, 176, 176, label="MCU-7742",
+        # ---- top edge: connectors and user-facing hardware ----------------
+        Component("J1", "connector", 120, 92, 300, 74, extra={"pins": 12}),
+        Component("J2", "header", 470, 96, 150, 54, extra={"pins": 6}),
+        Component("J3", "shield", 680, 90, 120, 64),
+        Component("J4", "header", 860, 96, 120, 54, extra={"pins": 5}),
+        Component("SW1", "button", 1040, 90, 58, 58),
+        Component("F1", "resistor", 1160, 100, 56, 26, label="2A"),
+
+        # ---- main active area ---------------------------------------------
+        Component("U1", "ic", 120, 250, 176, 176, label="MCU-7742",
                   extra={"pins_per_side": 11, "sublabel": "ARM-M4"}),
-        Component("U2", "ic", 520, 300, 104, 104, label="PMIC",
+        Component("Y1", "crystal", 340, 250, 76, 42, label="16.000"),
+        Component("U2", "ic", 340, 330, 108, 108, label="PMIC",
                   extra={"pins_per_side": 7, "sublabel": "3V3"}),
-        Component("U3", "ic", 760, 232, 86, 64, label="XCVR",
+        Component("U3", "ic", 500, 250, 90, 66, label="XCVR",
                   extra={"pins_per_side": 5, "sublabel": "CAN"}),
-
-        Component("J1", "connector", 180, 92, 300, 74, extra={"pins": 12}),
-        Component("J2", "header", 700, 96, 150, 54, extra={"pins": 6}),
-
-        Component("C1", "electrolytic", 540, 520, 96, 96),
-        Component("C2", "electrolytic", 680, 520, 96, 96),
-        Component("C3", "tantalum", 430, 540, 46, 28),
-        Component("C4", "mlcc", 430, 596, 38, 24),
-        Component("C5", "mlcc", 430, 640, 38, 24),
-        Component("C6", "mlcc", 214, 470, 34, 22),
-        Component("C7", "mlcc", 268, 470, 34, 22),
-        Component("C8", "mlcc", 322, 470, 34, 22),
-
-        Component("R1", "resistor", 214, 520, 40, 22, label="103"),
-        Component("R2", "resistor", 214, 560, 40, 22, label="472"),
-        Component("R3", "resistor", 214, 600, 40, 22, label="100"),
-        Component("R4", "resistor", 300, 520, 40, 22, label="220"),
-        Component("R5", "resistor", 300, 560, 40, 22, label="332"),
-        Component("R6", "resistor", 876, 470, 22, 40, label="10", rotation=90),
-
-        Component("Y1", "crystal", 430, 300, 72, 40, label="16.000"),
-        Component("L1", "inductor", 660, 420, 62, 52),
-        Component("D1", "led", 880, 320, 30, 30, extra={"tint": (90, 240, 120)}),
-        Component("D2", "led", 880, 376, 30, 30, extra={"tint": (90, 120, 250)}),
-        Component("U4", "ic", 820, 560, 92, 72, label="FLASH",
+        Component("U5", "ic", 500, 360, 76, 76, label="QFN",
+                  extra={"pins_per_side": 5, "sublabel": "IMU"}),
+        Component("L1", "inductor", 640, 250, 64, 54),
+        Component("D1", "led", 640, 340, 32, 32, extra={"tint": (90, 240, 120)}),
+        Component("D2", "led", 640, 395, 32, 32, extra={"tint": (90, 120, 250)}),
+        Component("C1", "electrolytic", 740, 250, 98, 98),
+        Component("C2", "electrolytic", 860, 250, 98, 98),
+        Component("U4", "ic", 1000, 250, 96, 76, label="FLASH",
                   extra={"pins_per_side": 6, "sublabel": "128M"}),
+        Component("U6", "ic", 1000, 370, 70, 56, label="EE",
+                  extra={"pins_per_side": 4, "sublabel": "I2C"}),
+        Component("K1", "connector", 1160, 250, 130, 72, extra={"pins": 4}),
+        Component("D3", "led", 1160, 360, 32, 32, extra={"tint": (70, 200, 250)}),
+
+        # ---- passive field: rows of near-identical parts -------------------
+        Component("R1", "resistor", 120, 500, 44, 24, label="103"),
+        Component("R2", "resistor", 120, 545, 44, 24, label="472"),
+        Component("R3", "resistor", 120, 590, 44, 24, label="100"),
+        Component("R4", "resistor", 190, 500, 44, 24, label="220"),
+        Component("R5", "resistor", 190, 545, 44, 24, label="332"),
+        Component("R7", "resistor", 190, 590, 44, 24, label="471"),
+        Component("R8", "resistor", 260, 500, 44, 24, label="152"),
+        Component("R9", "resistor", 260, 545, 44, 24, label="330"),
+        Component("R6", "resistor", 460, 500, 24, 44, label="10", rotation=90),
+
+        Component("C6", "mlcc", 120, 645, 40, 26),
+        Component("C7", "mlcc", 176, 645, 40, 26),
+        Component("C8", "mlcc", 232, 645, 40, 26),
+        Component("C9", "mlcc", 288, 645, 40, 26),
+        Component("C4", "mlcc", 120, 695, 40, 26),
+        Component("C5", "mlcc", 176, 695, 40, 26),
+        Component("C10", "mlcc", 232, 695, 40, 26),
+        Component("C11", "mlcc", 288, 695, 40, 26),
+
+        Component("C3", "tantalum", 380, 500, 50, 30),
+        Component("C12", "tantalum", 380, 550, 50, 30),
+        Component("Q1", "diode", 380, 600, 42, 24),
+        Component("Q2", "diode", 380, 645, 42, 24),
     ]
+
+    _assert_no_overlap(components)
     return components
+
+
+def _assert_no_overlap(components: list[Component], margin: int = 8) -> None:
+    """Catch a layout typo now rather than in a confusing benchmark result.
+
+    Two overlapping bodies would make the ground truth wrong -- removing one
+    part would change the pixels of another -- which is exactly the kind of
+    silent data bug that makes an evaluation meaningless.
+    """
+    for i, a in enumerate(components):
+        for b in components[i + 1:]:
+            if (
+                a.x - margin < b.x + b.w and b.x - margin < a.x + a.w
+                and a.y - margin < b.y + b.h and b.y - margin < a.y + a.h
+            ):
+                raise SystemExit(
+                    f"Layout error: {a.name} {a.bbox} overlaps {b.name} {b.bbox}"
+                )
 
 
 def render_board(
     components: list[Component],
     present: set[str],
     seed: int,
-    width: int = 1120,
-    height: int = 760,
+    width: int = 1400,
+    height: int = 820,
 ) -> np.ndarray:
     rng = np.random.default_rng(seed)
     board = make_substrate(width, height, rng)
@@ -543,16 +632,18 @@ def apply_camera(
 
 #: (filename stem, parts removed, nuisance severity, note shown in the docs)
 CASES: list[tuple[str, list[str], float, str]] = [
-    ("board_01_ok_clean",        [],                       0.15, "Good board, near-perfect retake"),
-    ("board_02_missing_U2",      ["U2"],                   0.25, "One mid-size IC removed"),
-    ("board_03_ok_dim",          [],                       0.60, "Good board, dimmer light and slight shift"),
-    ("board_04_missing_C1_R3",   ["C1", "R3"],             0.35, "Electrolytic plus a chip resistor"),
-    ("board_05_missing_small",   ["C6", "C7"],             0.30, "Two of the smallest passives"),
-    ("board_06_missing_three",   ["U3", "Y1", "D1"],       0.45, "IC, crystal and an LED"),
-    ("board_07_ok_harsh",        [],                       0.95, "Good board, worst-case photo"),
-    ("board_08_missing_J2",      ["J2"],                   0.55, "Connector removed, harsh light"),
-    ("board_09_missing_U1",      ["U1"],                   0.40, "The largest part on the board"),
-    ("board_10_missing_mixed",   ["R6", "C3", "L1", "U4"], 0.70, "Four parts, harsh photo"),
+    ("board_01_ok_clean",        [],                        0.15, "Good board, near-perfect retake"),
+    ("board_02_missing_U2",      ["U2"],                    0.25, "One mid-size IC removed"),
+    ("board_03_ok_dim",          [],                        0.60, "Good board, dimmer light and slight shift"),
+    ("board_04_missing_C1_R3",   ["C1", "R3"],              0.35, "Electrolytic plus a chip resistor"),
+    ("board_05_missing_small",   ["C6", "C7"],              0.30, "Two of the smallest passives"),
+    ("board_06_missing_three",   ["U3", "Y1", "D1"],        0.45, "IC, crystal and an LED"),
+    ("board_07_ok_harsh",        [],                        0.95, "Good board, worst-case photo"),
+    ("board_08_missing_J2",      ["J2"],                    0.55, "Connector removed, harsh light"),
+    ("board_09_missing_U1",      ["U1"],                    0.40, "The largest part on the board"),
+    ("board_10_missing_mixed",   ["R6", "C3", "L1", "U4"],  0.70, "Four parts, harsh photo"),
+    ("board_11_missing_metal",   ["J3", "SW1"],             0.50, "Bright metal can and a tactile switch"),
+    ("board_12_missing_lookalike", ["R7", "C9", "Q2"],      0.65, "Parts from rows of near-identical neighbours"),
 ]
 
 

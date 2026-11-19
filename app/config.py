@@ -96,6 +96,22 @@ class AnalysisConfig:
     #: statistics (SSIM windows, Canny) remain meaningful.
     min_patch_px: int = 24
 
+    #: Measurements are taken on the ROI shrunk by this much on every side.
+    #:
+    #: An operator's box encloses the component *and* a ring of its footprint:
+    #: solder pads, silkscreen outline, the via fanout. That ring is identical
+    #: whether the part is fitted or not, so including it dilutes every signal
+    #: with pixels that cannot carry the answer. On a small IC the pads were
+    #: holding correlation at 0.74 and edge agreement at 0.80 for a part that
+    #: had been removed outright.
+    #:
+    #: Measuring the inner region instead concentrates on the body. The ring is
+    #: still used for the local re-alignment search, where its contrast is an
+    #: asset rather than a liability.
+    body_inset_fraction: float = 0.14
+    max_body_inset_px: int = 7
+    min_body_px: int = 10
+
     #: Below this correlation peak the recovered offset is meaningless, so the
     #: remaining metrics are measured at zero offset instead.
     offset_trust_ncc: float = 0.20
@@ -234,9 +250,9 @@ class SensitivityPreset:
 
 
 #: Read off the operating curve in ``tools/evaluate.py --sweep``, not chosen
-#: by eye. Over 1,920 part decisions on the 80-board stress set the
-#: highest-scoring part that is actually present scores 0.247, and the
-#: weakest genuine removal scores 0.424. Every threshold in that gap gives
+#: by eye. Over 3,280 part decisions on the 80-board stress set the
+#: highest-scoring part that is actually present scores 0.373, and the
+#: weakest genuine removal scores 0.652. Every threshold in that gap gives
 #: 100% precision and 100% recall, so the presets sit inside it with margin
 #: on both sides rather than balanced on an edge.
 #:
@@ -249,22 +265,22 @@ SENSITIVITY_PRESETS: dict[str, SensitivityPreset] = {
         key="conservative",
         label="Conservative",
         description="Flags only unmistakable removals. Fewest false alarms.",
-        missing_threshold=0.40,
-        review_threshold=0.32,
+        missing_threshold=0.58,
+        review_threshold=0.49,
     ),
     "balanced": SensitivityPreset(
         key="balanced",
         label="Balanced",
         description="Recommended for a fixed camera on a stable line.",
-        missing_threshold=0.34,
-        review_threshold=0.27,
+        missing_threshold=0.52,
+        review_threshold=0.44,
     ),
     "sensitive": SensitivityPreset(
         key="sensitive",
         label="Sensitive",
         description="Catches subtle removals. Expect more review flags.",
-        missing_threshold=0.28,
-        review_threshold=0.23,
+        missing_threshold=0.44,
+        review_threshold=0.40,
     ),
 }
 

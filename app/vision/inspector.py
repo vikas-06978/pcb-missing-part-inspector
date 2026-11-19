@@ -194,15 +194,35 @@ def _analyse_part(
     if test_patch is None:  # pragma: no cover - bbox already clamped
         test_patch = np.zeros_like(ref_patch)
 
+    # --- narrow to the component body ---------------------------------------
+    # The search above wanted the footprint ring for its contrast; the
+    # measurements below want it gone, because pads and silkscreen look the
+    # same with or without the part sitting on them.
+    inset = int(np.clip(
+        round(ANALYSIS.body_inset_fraction * min(w, h)), 0, ANALYSIS.max_body_inset_px
+    ))
+    body_w, body_h = w - 2 * inset, h - 2 * inset
+
+    ref_body = test_body = None
+    if inset > 0 and body_w >= ANALYSIS.min_body_px and body_h >= ANALYSIS.min_body_px:
+        ref_body = _patch(reference_bgr, x + inset, y + inset, body_w, body_h)
+        test_body = _patch(aligned_bgr, x + dx + inset, y + dy + inset, body_w, body_h)
+
+    if ref_body is None or test_body is None:
+        ref_body, test_body = ref_patch, test_patch
+
     # --- measurements -------------------------------------------------------
-    ref_small = M.ensure_min_size(ref_patch)
-    test_small = M.ensure_min_size(test_patch)
+    ref_small = M.ensure_min_size(ref_body)
+    test_small = M.ensure_min_size(test_body)
 
     ref_gray = M.to_gray(ref_small)
     test_gray = M.to_gray(test_small)
 
     signals = {
-        "ncc": float(ncc),
+        # Correlation of the body alone. The full-ROI search peak is kept
+        # separately below: it answers "where is it", not "is it there".
+        "ncc": M.patch_correlation(ref_small, test_small),
+        "match_peak": float(ncc),
         "ssim": M.ssim(ref_gray, test_gray),
         "edge_correlation": M.edge_correlation(ref_gray, test_gray),
         "colour_distance": M.colour_distance(ref_small, test_small),

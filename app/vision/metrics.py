@@ -159,6 +159,15 @@ def _zero_mean_correlation(a: np.ndarray, b: np.ndarray) -> float:
     return float(np.clip(float(np.dot(av, bv)) / denom, -1.0, 1.0))
 
 
+def patch_correlation(a: np.ndarray, b: np.ndarray) -> float:
+    """Zero-mean normalised correlation of two same-sized patches.
+
+    Used where the patches are already aligned, so the full template search of
+    :func:`best_offset_ncc` would only add cost.
+    """
+    return _zero_mean_correlation(to_gray(a), to_gray(b))
+
+
 def edge_correlation(reference_gray: np.ndarray, test_gray: np.ndarray) -> float:
     """Correlation between the two patches' gradient-magnitude maps.
 
