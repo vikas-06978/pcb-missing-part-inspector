@@ -180,11 +180,6 @@ function createAnnotator() {
       updateZoomReadout();
     },
     onSelect: () => renderPartList(),
-    onToolChange: (tool) => {
-      for (const button of document.querySelectorAll('#tool-switch button')) {
-        button.classList.toggle('is-active', button.dataset.tool === tool);
-      }
-    },
     onRenameRequest: (id) => {
       const input = document.querySelector(`.part-row[data-id="${id}"] .part-row__name`);
       if (input) {
@@ -206,9 +201,32 @@ function updateZoomReadout() {
   $('#zoom-readout').textContent = `${Math.round(state.annotator.view.scale * 100)}%`;
 }
 
+let renderingPartList = false;
+
+//: Set when Enter should walk to the next name field. The rebuild honours it
+//: instead of restoring focus to the row just left, which is deterministic --
+//: the previous version raced a requestAnimationFrame against the rebuild's
+//: own focus restoration and usually lost.
+let pendingFocusIndex = null;
+
 function renderPartList() {
   const annotator = state.annotator;
   if (!annotator) return;
+
+  // Re-entrancy guard. Rebuilding this list restores focus to the row that
+  // had it, focusing a name field selects its part, and selecting re-renders
+  // the list -- a cycle that blew the stack the moment Enter started walking
+  // between fields.
+  if (renderingPartList) return;
+  renderingPartList = true;
+  try {
+    renderPartListInner(annotator);
+  } finally {
+    renderingPartList = false;
+  }
+}
+
+function renderPartListInner(annotator) {
 
   const parts = annotator.getParts();
   const list = $('#part-list');
@@ -240,12 +258,26 @@ function renderPartList() {
     const input = row.querySelector('.part-row__name');
     input.value = part.name;
 
-    input.addEventListener('focus', () => annotator.select(part.id));
+    input.addEventListener('focus', () => {
+      // Only act on a real change of selection, so restoring focus during a
+      // rebuild does not kick off another one.
+      if (annotator.selectedIds.size === 1 && annotator.isSelected(part.id)) return;
+      annotator.select(part.id);
+    });
     input.addEventListener('change', () => annotator.renamePart(part.id, input.value.trim()));
     input.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {
-        input.blur();
         event.preventDefault();
+        // Naming forty parts is the slowest thing in the whole workflow, so
+        // Enter walks to the next one instead of just dismissing the field.
+        pendingFocusIndex = index + 1;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        if (pendingFocusIndex !== null) {
+          // The name did not actually change, so no rebuild happened.
+          pendingFocusIndex = null;
+          const next = list.querySelectorAll('.part-row__name')[index + 1];
+          if (next) { next.focus(); next.select(); } else input.blur();
+        }
       }
       event.stopPropagation();      // let the editor keep Delete / arrows
     });
@@ -270,7 +302,17 @@ function renderPartList() {
     list.appendChild(row);
   });
 
-  if (activeId) {
+  if (pendingFocusIndex !== null) {
+    const target = list.querySelectorAll('.part-row__name')[pendingFocusIndex];
+    pendingFocusIndex = null;
+    if (target) {
+      target.focus();
+      target.select();
+      target.closest('.part-row').scrollIntoView({ block: 'nearest' });
+    } else {
+      document.activeElement?.blur();
+    }
+  } else if (activeId) {
     const restored = list.querySelector(`.part-row[data-id="${activeId}"] .part-row__name`);
     if (restored) {
       restored.focus();
@@ -644,11 +686,6 @@ async function main() {
   $('#zoom-fit').addEventListener('click', () => state.annotator?.view.fit(24, { animate: true }));
   $('#zoom-readout').addEventListener('click', () => state.annotator?.view.zoomTo(1));
   $('#zoom-selection').addEventListener('click', () => state.annotator?.zoomToSelection());
-
-  $('#tool-switch').addEventListener('click', (event) => {
-    const button = event.target.closest('button[data-tool]');
-    if (button) state.annotator?.setTool(button.dataset.tool);
-  });
 
   $('#suggest-parts').addEventListener('click', suggestParts);
   $('#rename-all').addEventListener('click', () => state.annotator?.autoName());

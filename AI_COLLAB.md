@@ -7,7 +7,7 @@ It starts at the very first prompt.
 
 ## How this was built, honestly
 
-This document covers twelve decisions. I set the objective, the constraints
+This document covers fourteen decisions. I set the objective, the constraints
 and the quality bar, and handed the
 implementation to Claude (Claude Code, Opus) with an explicit mandate to make
 the technical and design choices itself — my words were *"you to choose
@@ -281,6 +281,59 @@ zoom-to-selection, so the board never teleports.
 **Evidence:** verified by driving the canvas with synthetic pointer events —
 plain scroll leaves the zoom level untouched, `Ctrl`+scroll changes it, a
 marquee across two parts selects exactly two.
+
+---
+
+## Decision 13 — A photo of half the board must not invent the other half
+
+**Asked for:** should a close-up of part of the board still work?
+
+**AI's first behaviour:** it "worked" in the worst way. The homography was
+fine, but everything outside the photo was filled by edge-pixel replication,
+so parts that were never photographed were measured against smeared pixels and
+could be called missing. A confident verdict on evidence that does not exist.
+
+**Decided:** separate *aligned* from *observed*. Warping a solid white
+rectangle through the same homography says exactly which reference pixels the
+photo covers. A part covered less than 70% is reported **Not in view** -- grey,
+excluded from the verdict, counted in the summary -- and the headline becomes
+"OK for 10 of 41 parts" rather than a bare "OK".
+
+**A second bug fell out of it.** Partial photos were being letterboxed onto a
+reference-sized black canvas. Registration runs CLAHE, CLAHE turns the sensor
+noise in flat black into texture, and the detector then tried to match it.
+Alignment quality on a 60% crop sat at 0.65 and the reported coverage was off
+by a third. Handing the photo over untouched -- SIFT is scale-invariant and
+RANSAC does not care about image bounds -- took quality to **0.89** and made
+coverage exact.
+
+**Evidence:** on a 60% crop the three genuinely missing parts were still found,
+33 of 41 checked. On a 50% crop containing none of them: zero false alarms, 31
+parts correctly reported as not in view.
+
+---
+
+## Decision 14 — Delete the tool palette
+
+**AI built:** draw and select tools with a toggle, copying Figma.
+
+**Decided:** remove it. Dragging on empty board always draws a part; `Shift`
+-drag marquee-selects.
+
+**Why:** Figma needs a palette because it draws a dozen kinds of object. Here
+there is exactly one, so the toggle added a mode the user can leave in the
+wrong state -- and the person using it at the demo has never seen the app. A
+mode that silently changes what dragging does is a trap, not a feature.
+Double-clicking empty board now fits the whole board, because getting lost
+while zoomed in is the easiest way to feel stuck.
+
+**Two real bugs surfaced while testing the simplification:** a plain click on
+the board created a 6x6 part (the minimum-size clamp ran *before* the
+is-this-a-drag check, so every stray click added an invisible part), and the
+name list recursed into itself until the stack blew -- focusing a name field
+selected its part, selecting re-rendered the list, and re-rendering restored
+focus. Both were pre-existing and only became reachable once naming got
+faster.
 
 ---
 

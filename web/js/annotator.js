@@ -8,20 +8,21 @@
  *
  *   scroll / two-finger drag ....... pan
  *   ctrl or cmd + scroll, pinch .... zoom at the pointer
- *   space + drag, middle drag ...... pan
- *   V / R .......................... select tool, draw tool
- *   drag on empty (draw tool) ...... new part
- *   drag on empty (select tool) .... marquee select
+ *   space drag, middle drag, right drag ... pan
+ *   double-click empty board ....... fit the whole board back in view
+ *   drag on empty .................. new part
+ *   shift + drag on empty .......... marquee select
  *   shift-click .................... add or remove from selection
  *   alt + drag ..................... duplicate
  *   arrows / shift+arrows .......... nudge 1 px / 10 px
  *   ctrl+A, ctrl+D, Del, F2 ........ select all, duplicate, delete, rename
  *   shift+1 / shift+2 / shift+0 .... zoom fit / to selection / 100%
  *
- * The one deliberate break from Figma: with the draw tool active, dragging on
- * empty canvas creates a part rather than a marquee. Drawing boxes *is* the
- * task here, and making the common action the default saves a tool switch on
- * every single part.
+ * There is deliberately no tool palette. Figma needs one because it draws a
+ * dozen kinds of object; here there is exactly one, and a mode switch the user
+ * can leave in the wrong state is a trap, not a feature. Dragging on empty
+ * board always draws a part, which is the task; holding shift marquee-selects,
+ * which matches shift-click already meaning "extend the selection".
  *
  * Renaming happens in the side list rather than in an in-canvas text field: a
  * real input gets native caret handling, selection and IME for free.
@@ -50,21 +51,19 @@ const CURSORS = {
 };
 
 export class Annotator {
-  constructor({ canvas, host, emptyHint, onChange, onSelect, onRenameRequest, onToolChange }) {
+  constructor({ canvas, host, emptyHint, onChange, onSelect, onRenameRequest }) {
     this.view = new CanvasView(canvas, host);
     this.host = host;
     this.emptyHint = emptyHint;
     this.onChange = onChange || (() => {});
     this.onSelect = onSelect || (() => {});
     this.onRenameRequest = onRenameRequest || (() => {});
-    this.onToolChange = onToolChange || (() => {});
 
     this.image = null;
     this.parts = [];
     this.selectedIds = new Set();
     this.hoveredId = null;
 
-    this.tool = 'draw';
     this.mode = 'idle';
     this.draft = null;
     this.marquee = null;
@@ -120,14 +119,6 @@ export class Annotator {
 
   isSelected(id) {
     return this.selectedIds.has(id);
-  }
-
-  setTool(tool) {
-    if (tool !== 'draw' && tool !== 'select') return;
-    this.tool = tool;
-    this.onToolChange(tool);
-    this._applyCursor();
-    this.requestDraw();
   }
 
   // ---- mutation with undo ------------------------------------------------
@@ -484,10 +475,10 @@ export class Annotator {
       if (!additive) this.select(null);
       const image = this.view.toImage(point.x, point.y);
 
-      if (this.tool === 'select') {
+      if (event.shiftKey) {
         this.mode = 'marquee';
         this.marquee = { x0: point.x, y0: point.y, x1: point.x, y1: point.y };
-        this._drag = { base: new Set(additive ? this.selectedIds : []) };
+        this._drag = { base: new Set(this.selectedIds) };
       } else {
         this.mode = 'draw';
         this.draft = { x0: image.x, y0: image.y, x1: image.x, y1: image.y };
@@ -569,20 +560,25 @@ export class Annotator {
     const finish = () => {
       if (this.mode === 'draw' && this.draft) {
         const { x0, y0, x1, y1 } = this.draft;
+        const dragged = [Math.abs(x1 - x0), Math.abs(y1 - y0)];
         const box = this._clampBox([
           Math.round(Math.min(x0, x1)),
           Math.round(Math.min(y0, y1)),
-          Math.round(Math.abs(x1 - x0)),
-          Math.round(Math.abs(y1 - y0)),
+          Math.round(dragged[0]),
+          Math.round(dragged[1]),
         ]);
         this.draft = null;
-        // A click, not a drag: treat as "deselect" rather than creating a
-        // one-pixel part nobody can see or hit again.
-        if (box[2] >= MIN_BOX && box[3] >= MIN_BOX) {
+        // Measure the drag BEFORE clamping. _clampBox enforces a minimum
+        // size, so clamping first turned every stray click on the board into
+        // a 6x6 part -- invisible, unhittable, and quietly in the part list.
+        if (dragged[0] >= MIN_BOX && dragged[1] >= MIN_BOX) {
           this._snapshot();
           const part = { id: makeId(), name: `Part ${this.parts.length + 1}`, bbox: box };
           this.parts.push(part);
           this.selectedIds = new Set([part.id]);
+          // From the first box onward the framing is the operator's business.
+          // Auto-fit on layout changes would shift the board under their hand.
+          this.view.userMoved = true;
           this._emit();
           this.onSelect(part.id);
           this.onRenameRequest(part.id);
@@ -591,6 +587,7 @@ export class Annotator {
         this.marquee = null;
         this.onSelect(this.selectedId);
       } else if (this.mode === 'move' || this.mode === 'resize') {
+        this.view.userMoved = true;
         this._emit();
       }
 
@@ -610,7 +607,12 @@ export class Annotator {
       if (hit) {
         this.select(hit.id);
         this.onRenameRequest(hit.id);
+        return;
       }
+      // Double-click on empty board brings the whole thing back into view.
+      // Getting lost while zoomed in is the easiest way to feel stuck, and
+      // this is the gesture people already try.
+      this.view.fit(24, { animate: true });
     });
 
     canvas.addEventListener('wheel', (event) => {
@@ -676,7 +678,7 @@ export class Annotator {
         return;
       }
     }
-    canvas.style.cursor = this.tool === 'draw' ? 'crosshair' : 'default';
+    canvas.style.cursor = 'crosshair';
   }
 
   _resized(origin, handle, image) {
@@ -753,9 +755,6 @@ export class Annotator {
         if (this.selectedIds.size) this.select(null);
         return;
       }
-
-      if (key === 'v') { this.setTool('select'); return; }
-      if (key === 'r') { this.setTool('draw'); return; }
 
       if (event.shiftKey && key === '!') { this.view.fit(24, { animate: true }); return; }
       if (event.shiftKey && key === '@') { this.zoomToSelection(); return; }

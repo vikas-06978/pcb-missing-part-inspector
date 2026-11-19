@@ -12,12 +12,15 @@
 import { CanvasView, drawLabel, roundedRectPath } from './view.js';
 import { loadImage, stateColour, formatTime, downloadBlob } from './ui.js';
 
-const STATE_LABEL = { present: 'Present', review: 'Review', missing: 'Missing' };
+const STATE_LABEL = {
+  present: 'Present', review: 'Review', missing: 'Missing', not_visible: 'Not in view',
+};
 
 const ICONS = {
   ok: '<path d="M4 12.5 9.5 18 20 6.5"/>',
   review: '<path d="M12 8v5.5M12 17.2v.1"/><path d="M10.3 3.9 2.6 17.4A2 2 0 0 0 4.3 20.4h15.4a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/>',
   missing: '<circle cx="12" cy="12" r="8.6"/><path d="M8.8 8.8l6.4 6.4M15.2 8.8l-6.4 6.4"/>',
+  not_visible: '<path d="M3 12s3.6-6.4 9-6.4S21 12 21 12s-3.6 6.4-9 6.4S3 12 3 12Z"/><path d="M4 4l16 16"/>',
 };
 
 const bannerKind = (status) => (status === 'present' ? 'ok' : status);
@@ -42,28 +45,29 @@ export function renderOverlayCanvas(image, verdicts, { lineScale = 1 } = {}) {
 
   // Present parts first so that a missing box is never hidden under a
   // neighbouring green one.
-  const ordered = [...verdicts].sort(
-    (a, b) => (a.state === 'present' ? 0 : 1) - (b.state === 'present' ? 0 : 1),
-  );
+  const rank = (v) => (v.state === 'missing' ? 3 : v.state === 'review' ? 2 : v.state === 'present' ? 1 : 0);
+  const ordered = [...verdicts].sort((a, b) => rank(a) - rank(b));
 
   for (const verdict of ordered) {
     const [x, y, w, h] = verdict.bbox;
     const colour = stateColour(verdict.state);
+    const alarming = verdict.state === 'missing' || verdict.state === 'review';
     ctx.save();
     roundedRectPath(ctx, x, y, w, h, 3 * base);
-    if (verdict.state !== 'present') {
+    if (alarming) {
       ctx.fillStyle = colour.replace(')', ', 0.22)').replace('rgb', 'rgba');
       ctx.globalAlpha = 0.25;
       ctx.fillStyle = colour;
       ctx.fill();
       ctx.globalAlpha = 1;
     }
-    ctx.lineWidth = verdict.state === 'present' ? lineWidth * 0.62 : lineWidth;
+    ctx.lineWidth = alarming ? lineWidth : lineWidth * 0.62;
+    ctx.globalAlpha = verdict.state === 'not_visible' ? 0.55 : 1;
     ctx.strokeStyle = colour;
     ctx.stroke();
     ctx.restore();
 
-    if (verdict.state !== 'present') {
+    if (alarming) {
       drawLabel(ctx, verdict.name, x, y, colour, {
         fontSize: Math.max(11, base * 11),
         canvasWidth: canvas.width,
@@ -117,7 +121,14 @@ export async function renderCards(host, results, onOpen) {
       ...review.map((name) => `<span class="chip chip--review">${escapeHtml(name)}</span>`),
     ];
     if (!chips.length) {
-      chips.push(`<span class="chip chip--muted">${result.summary.total_parts} parts verified</span>`);
+      chips.push(
+        `<span class="chip chip--muted">${result.summary.checked_count} parts verified</span>`,
+      );
+    }
+    if (result.summary.not_visible_count) {
+      chips.push(
+        `<span class="chip chip--muted">${result.summary.not_visible_count} not in view</span>`,
+      );
     }
 
     card.innerHTML = `
@@ -334,9 +345,8 @@ export class DetailView {
       ctx.drawImage(test, tx, ty, w, h);
     }
 
-    const ordered = [...this.result.verdicts].sort(
-      (a, b) => (a.state === 'present' ? 0 : 1) - (b.state === 'present' ? 0 : 1),
-    );
+    const rank = (v) => (v.state === 'missing' ? 3 : v.state === 'review' ? 2 : v.state === 'present' ? 1 : 0);
+    const ordered = [...this.result.verdicts].sort((a, b) => rank(a) - rank(b));
 
     for (const verdict of ordered) {
       const [bx, by, bw, bh] = verdict.bbox;
@@ -344,21 +354,23 @@ export class DetailView {
       const rect = { x: topLeft.x, y: topLeft.y, w: bw * scale, h: bh * scale };
       const colour = stateColour(verdict.state);
       const isHovered = this.hovered === verdict.part_id;
+      const alarming = verdict.state === 'missing' || verdict.state === 'review';
 
       ctx.save();
       roundedRectPath(ctx, rect.x, rect.y, rect.w, rect.h, 3);
-      if (verdict.state !== 'present' || isHovered) {
+      if (alarming || isHovered) {
         ctx.globalAlpha = isHovered ? 0.3 : 0.2;
         ctx.fillStyle = colour;
         ctx.fill();
         ctx.globalAlpha = 1;
       }
-      ctx.lineWidth = isHovered ? 3 : verdict.state === 'present' ? 1.2 : 2;
+      ctx.lineWidth = isHovered ? 3 : alarming ? 2 : 1.2;
+      ctx.globalAlpha = verdict.state === 'not_visible' && !isHovered ? 0.55 : 1;
       ctx.strokeStyle = colour;
       ctx.stroke();
       ctx.restore();
 
-      if (verdict.state !== 'present' || isHovered) {
+      if (alarming || isHovered) {
         drawLabel(ctx, verdict.name, rect.x, rect.y, colour, { canvasWidth: this.view.width });
       }
     }
@@ -374,11 +386,16 @@ export class DetailView {
     verdictBox.innerHTML = `
       <h3>${escapeHtml(headline)}</h3>
       <p>${
-        status === 'present'
-          ? 'Every named part was found on this board.'
-          : status === 'missing'
-            ? `Missing: ${result.summary.missing_names.map(escapeHtml).join(', ')}`
-            : `Please check: ${result.summary.review_names.map(escapeHtml).join(', ')}`
+        status === 'missing'
+          ? `Missing: ${escapeHtml(result.summary.missing_names.join(', '))}`
+          : status === 'review'
+            ? `Please check: ${escapeHtml(result.summary.review_names.join(', '))}`
+            : status === 'not_visible'
+              ? 'None of the named parts are inside this photograph.'
+              : result.summary.not_visible_count
+                ? `All ${result.summary.checked_count} parts in view are present. `
+                  + `${result.summary.not_visible_count} were outside the photo.`
+                : 'Every named part was found on this board.'
       }</p>`;
 
     const alignment = result.alignment;
@@ -404,7 +421,7 @@ export class DetailView {
     const list = this.dialog.querySelector('#verdict-list');
     list.innerHTML = '';
 
-    const order = { missing: 0, review: 1, present: 2 };
+    const order = { missing: 0, review: 1, present: 2, not_visible: 3 };
     const sorted = [...result.verdicts].sort(
       (a, b) => order[a.state] - order[b.state] || b.confidence - a.confidence,
     );

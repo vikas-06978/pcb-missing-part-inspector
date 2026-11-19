@@ -639,7 +639,7 @@ u { text-decoration-color: var(--brand-line); text-underline-offset: 3px; }
 }
 .toolgroup { display: flex; align-items: center; gap: 4px; }
 .stage-hint {
-  margin: 0 auto;
+  margin: 0 auto 0 4px;
   color: var(--text-dim);
   font-size: 0.78rem;
   text-align: center;
@@ -647,7 +647,8 @@ u { text-decoration-color: var(--brand-line); text-underline-offset: 3px; }
 }
 /* The hint is a courtesy, not information the user needs twice. Drop it
    before it is allowed to wrap and push the canvas down. */
-@media (max-width: 1240px) { .stage-hint { display: none; } }
+.stage-hint b { color: var(--text-mid); font-weight: 620; }
+@media (max-width: 980px) { .stage-hint { display: none; } }
 
 .zoom-readout {
   min-width: 54px;
@@ -662,18 +663,6 @@ u { text-decoration-color: var(--brand-line); text-underline-offset: 3px; }
   transition: background 0.14s var(--ease), color 0.14s var(--ease);
 }
 .zoom-readout:hover { background: var(--surface-3); color: var(--text); }
-
-.tool-icon {
-  width: 15px; height: 15px;
-  fill: none; stroke: currentColor;
-  stroke-width: 1.7; stroke-linejoin: round;
-}
-#tool-switch button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-#tool-switch button[data-tool="select"] .tool-icon { fill: currentColor; stroke-width: 1.2; }
 
 .tool-sep {
   width: 1px;
@@ -991,6 +980,7 @@ u { text-decoration-color: var(--brand-line); text-underline-offset: 3px; }
 .banner--ok      { background: var(--ok-soft);      color: var(--ok); }
 .banner--review  { background: var(--review-soft);  color: var(--review); }
 .banner--missing { background: var(--missing-soft); color: var(--missing); }
+.banner--not_visible { background: var(--surface-3); color: var(--text-mid); }
 
 .board-card__body { padding: 13px 15px 15px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
 .board-card__file {
@@ -1152,6 +1142,7 @@ dialog::backdrop { background: rgba(3, 6, 11, 0.68); backdrop-filter: blur(5px);
 .dot--ok { background: var(--ok); }
 .dot--review { background: var(--review); }
 .dot--missing { background: var(--missing); }
+.dot--unseen { background: var(--text-dim); }
 
 .detail__side {
   border-left: 1px solid var(--border);
@@ -1171,6 +1162,7 @@ dialog::backdrop { background: rgba(3, 6, 11, 0.68); backdrop-filter: blur(5px);
 .verdict--ok      { background: var(--ok-soft);      color: var(--ok); }
 .verdict--review  { background: var(--review-soft);  color: var(--review); }
 .verdict--missing { background: var(--missing-soft); color: var(--missing); }
+.verdict--not_visible { background: var(--surface-3); color: var(--text-mid); }
 
 .diagnostics { display: grid; gap: 7px; margin-bottom: 20px; }
 .diag-row {
@@ -1231,9 +1223,12 @@ dialog::backdrop { background: rgba(3, 6, 11, 0.68); backdrop-filter: blur(5px);
 .vrow--present .vrow__dot { background: var(--ok); }
 .vrow--review  .vrow__dot { background: var(--review); }
 .vrow--missing .vrow__dot { background: var(--missing); }
+.vrow--not_visible .vrow__dot { background: var(--text-dim); }
+.vrow--not_visible .vrow__name { color: var(--text-dim); }
 .vrow--present .vrow__state { color: var(--text-dim); }
 .vrow--review  .vrow__state { color: var(--review); }
 .vrow--missing .vrow__state { color: var(--missing); }
+.vrow--not_visible .vrow__state { color: var(--text-dim); }
 
 .vrow__body { padding: 0 11px 12px; display: none; }
 .vrow.is-open .vrow__body { display: block; animation: panel-in 0.22s var(--ease-out); }

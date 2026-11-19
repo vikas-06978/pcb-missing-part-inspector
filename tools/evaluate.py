@@ -65,12 +65,12 @@ def run_all(
     """Run the engine once per case and keep the raw confidences."""
     results = []
     for case in truth["cases"]:
-        image = fit_to_reference(
+        image, content_mask = fit_to_reference(
             to_working_size(load(samples_dir / case["file"])), reference.shape
         )
         started = time.perf_counter()
         result = inspect(reference, parts, image, sensitivity=sensitivity,
-                         keep_aligned_image=False)
+                         keep_aligned_image=False, test_mask=content_mask)
         elapsed = (time.perf_counter() - started) * 1000
 
         results.append(

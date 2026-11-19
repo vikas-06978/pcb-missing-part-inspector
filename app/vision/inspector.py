@@ -32,10 +32,12 @@ import numpy as np
 from app.config import (
     ANALYSIS,
     DEFAULT_SENSITIVITY,
+    MIN_PART_COVERAGE,
     RAMPS,
     SCENE,
     SENSITIVITY_PRESETS,
     STATE_MISSING,
+    STATE_NOT_VISIBLE,
     STATE_PRESENT,
     STATE_REVIEW,
     VETO,
@@ -43,7 +45,7 @@ from app.config import (
 )
 from app.vision import metrics as M
 from app.vision.photometric import board_mask, match_levels, match_sharpness
-from app.vision.registration import Alignment, align, warp_to_reference
+from app.vision.registration import Alignment, align, coverage_mask, warp_to_reference
 
 # Human-readable explanation for each evidence channel when it fires.
 SIGNAL_LABELS: dict[str, tuple[str, str]] = {
@@ -64,6 +66,7 @@ class PartVerdict:
     state: str
     confidence: float
     raw_confidence: float
+    coverage: float
     offset: list[int]
     signals: dict[str, float]
     scores: dict[str, float]
@@ -97,12 +100,18 @@ class InspectionResult:
         return [v for v in self.verdicts if v.state == STATE_REVIEW]
 
     @property
+    def not_visible(self) -> list[PartVerdict]:
+        return [v for v in self.verdicts if v.state == STATE_NOT_VISIBLE]
+
+    @property
     def is_ok(self) -> bool:
         return not self.missing and not self.review
 
     def summary(self) -> dict[str, Any]:
         missing = self.missing
         review = self.review
+        unseen = self.not_visible
+        checked = len(self.verdicts) - len(unseen)
         if missing:
             status = STATE_MISSING
             headline = (
@@ -115,19 +124,27 @@ class InspectionResult:
                 f"{len(review)} part needs review" if len(review) == 1
                 else f"{len(review)} parts need review"
             )
+        elif checked == 0:
+            status = STATE_NOT_VISIBLE
+            headline = "No named parts in view"
         else:
             status = STATE_PRESENT
-            headline = "OK"
+            # Never a bare "OK" for a partial photo: it would read as a verdict
+            # on the whole board when half of it was never shown.
+            headline = "OK" if not unseen else f"OK for {checked} of {len(self.verdicts)} parts"
 
         return {
             "status": status,
             "headline": headline,
             "total_parts": len(self.verdicts),
+            "checked_count": checked,
             "missing_count": len(missing),
             "review_count": len(review),
-            "present_count": len(self.verdicts) - len(missing) - len(review),
+            "not_visible_count": len(unseen),
+            "present_count": checked - len(missing) - len(review),
             "missing_names": [v.name for v in missing],
             "review_names": [v.name for v in review],
+            "not_visible_names": [v.name for v in unseen],
         }
 
 
@@ -322,6 +339,7 @@ def inspect(
     test_bgr: np.ndarray,
     sensitivity: str = DEFAULT_SENSITIVITY,
     keep_aligned_image: bool = True,
+    test_mask: np.ndarray | None = None,
 ) -> InspectionResult:
     """Run a full inspection of one test photograph against the reference."""
     preset = SENSITIVITY_PRESETS.get(sensitivity, SENSITIVITY_PRESETS[DEFAULT_SENSITIVITY])
@@ -340,6 +358,17 @@ def inspect(
         reference_bgr, aligned
     )
 
+    # How much of each part the photograph actually shows.
+    visible = coverage_mask(
+        test_bgr.shape, alignment.matrix, reference_bgr.shape, test_mask
+    )
+    height, width = reference_bgr.shape[:2]
+    coverages: list[float] = []
+    for part in part_list:
+        px, py, pw, ph = _clamp_bbox(part["bbox"], width, height)
+        region = visible[py:py + ph, px:px + pw]
+        coverages.append(float(np.count_nonzero(region)) / max(region.size, 1))
+
     raw: list[tuple[dict[str, float], dict[str, float], tuple[int, int]]] = []
     for part in part_list:
         raw.append(
@@ -350,8 +379,9 @@ def inspect(
 
     # --- scene compensation -------------------------------------------------
     compensation = 0.0
-    if SCENE.enabled and len(raw_confidences) >= SCENE.min_parts:
-        median = float(np.median(raw_confidences))
+    judged = [c for c, cov in zip(raw_confidences, coverages) if cov >= MIN_PART_COVERAGE]
+    if SCENE.enabled and len(judged) >= SCENE.min_parts:
+        median = float(np.median(judged))
         if median > SCENE.trigger_median:
             compensation = min(
                 SCENE.max_subtraction,
@@ -359,6 +389,15 @@ def inspect(
             )
 
     warnings = list(alignment.warnings)
+
+    unseen_count = sum(1 for c in coverages if c < MIN_PART_COVERAGE)
+    if unseen_count:
+        warnings.append(
+            f"This photo shows about {alignment.coverage * 100:.0f}% of the reference "
+            f"board, so {unseen_count} of {len(part_list)} named part(s) could not be "
+            "checked. They are listed as not visible rather than guessed at."
+        )
+
     if compensation > 0.01:
         warnings.append(
             "Every part looked slightly different from the reference, which "
@@ -373,18 +412,27 @@ def inspect(
         )
 
     verdicts: list[PartVerdict] = []
-    for part, (signals, scores, offset), raw_confidence in zip(part_list, raw, raw_confidences):
+    for part, (signals, scores, offset), raw_confidence, coverage in zip(
+        part_list, raw, raw_confidences, coverages
+    ):
         confidence = float(np.clip(raw_confidence - compensation, 0.0, 1.0))
+        evidence, reason = _build_evidence(scores)
 
-        if confidence >= preset.missing_threshold:
+        if coverage < MIN_PART_COVERAGE:
+            state = STATE_NOT_VISIBLE
+            confidence = 0.0
+            reason = (
+                "This part is outside the photograph, so it was not checked."
+                if coverage < 0.02
+                else f"Only {coverage * 100:.0f}% of this part is in the photograph, "
+                     "which is too little to judge."
+            )
+        elif confidence >= preset.missing_threshold:
             state = STATE_MISSING
         elif confidence >= preset.review_threshold:
             state = STATE_REVIEW
         else:
             state = STATE_PRESENT
-
-        evidence, reason = _build_evidence(scores)
-        if state == STATE_PRESENT:
             reason = "Matches the reference board."
 
         bbox = list(_clamp_bbox(part["bbox"], reference_bgr.shape[1], reference_bgr.shape[0]))
@@ -395,6 +443,7 @@ def inspect(
                 bbox=bbox,
                 state=state,
                 confidence=round(confidence, 4),
+                coverage=round(coverage, 4),
                 raw_confidence=round(raw_confidence, 4),
                 offset=[int(offset[0]), int(offset[1])],
                 signals={k: round(float(v), 4) for k, v in signals.items()},

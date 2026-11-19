@@ -160,20 +160,9 @@
     <div class="editor">
       <div class="editor__stage">
         <div class="stage-toolbar">
-          <div class="segmented" id="tool-switch" role="group" aria-label="Canvas tool">
-            <button data-tool="draw" class="is-active" type="button" title="Draw parts (R)">
-              <svg viewBox="0 0 24 24" class="tool-icon" aria-hidden="true"><rect x="4.5" y="6.5" width="15" height="11" rx="2"/><path d="M4.5 12h15M12 6.5v11" opacity=".45"/></svg>
-              Draw
-            </button>
-            <button data-tool="select" type="button" title="Select and move (V)">
-              <svg viewBox="0 0 24 24" class="tool-icon" aria-hidden="true"><path d="M6 4l12 7.2-5.3 1.3L10.4 18z"/></svg>
-              Select
-            </button>
-          </div>
-
-          <p class="stage-hint">
-            Drag to add a part &middot; scroll to pan &middot;
-            <kbd>Ctrl</kbd>+scroll to zoom &middot; double-click to rename
+          <p class="stage-hint stage-hint--lead">
+            <b>Drag</b> to add a part &middot; <b>scroll</b> to move &middot;
+            <kbd>Ctrl</kbd>+scroll to zoom &middot; double-click empty board to fit
           </p>
 
           <div class="toolgroup">
@@ -291,6 +280,7 @@
         <span><i class="dot dot--ok"></i>Present</span>
         <span><i class="dot dot--review"></i>Needs review</span>
         <span><i class="dot dot--missing"></i>Missing</span>
+        <span><i class="dot dot--unseen"></i>Not in view</span>
       </div>
     </div>
 
@@ -320,14 +310,16 @@
   <table class="sheet__keys">
     <tr><td>Scroll / two-finger drag</td><td>Pan</td></tr>
     <tr><td><kbd>Ctrl</kbd>+scroll, pinch</td><td>Zoom where the pointer is</td></tr>
-    <tr><td><kbd>Space</kbd>+drag, middle-drag</td><td>Pan</td></tr>
+    <tr><td><kbd>Space</kbd>+drag, middle-drag, right-drag</td><td>Pan</td></tr>
+    <tr><td>Double-click empty board</td><td>Fit the whole board in view</td></tr>
     <tr><td><kbd>Shift</kbd>+<kbd>1</kbd> / <kbd>2</kbd> / <kbd>0</kbd></td><td>Fit, zoom to selection, 100%</td></tr>
   </table>
 
   <h3>Working with parts</h3>
   <table class="sheet__keys">
-    <tr><td><kbd>R</kbd> / <kbd>V</kbd></td><td>Draw tool / select tool</td></tr>
-    <tr><td>Drag on empty board</td><td>New part (draw tool), marquee (select tool)</td></tr>
+    <tr><td>Drag on empty board</td><td>New part</td></tr>
+    <tr><td><kbd>Shift</kbd>+drag on empty</td><td>Marquee select</td></tr>
+    <tr><td><kbd>Enter</kbd> while naming</td><td>Jump to the next part</td></tr>
     <tr><td><kbd>Shift</kbd>+click</td><td>Add or remove from the selection</td></tr>
     <tr><td><kbd>Alt</kbd>+drag</td><td>Duplicate as you drag</td></tr>
     <tr><td>Double-click, <kbd>F2</kbd></td><td>Rename</td></tr>

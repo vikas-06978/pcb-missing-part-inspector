@@ -184,12 +184,14 @@ know:
 |---|---|
 | Scroll, two-finger drag | Pan |
 | `Ctrl`/`Cmd` + scroll, pinch | Zoom where the pointer is |
-| `Space` + drag, middle-drag | Pan |
-| `R` / `V` | Draw tool / select tool |
-| Drag on empty board | New part (draw), marquee select (select) |
+| `Space`-drag, middle-drag, right-drag | Pan |
+| Double-click empty board | Fit the whole board back in view |
+| Drag on empty board | New part |
+| `Shift` + drag on empty | Marquee select |
 | `Shift` + click | Add to or remove from the selection |
 | `Alt` + drag | Duplicate as you drag |
-| Double-click, `F2` | Rename |
+| Double-click a box, `F2` | Rename |
+| `Enter` while naming | Save and jump to the next part |
 | `Ctrl`+`A` / `Ctrl`+`D` | Select all / duplicate |
 | Arrows, `Shift`+arrows | Nudge 1 px / 10 px |
 | `Ctrl`+`Z` / `Ctrl`+`Shift`+`Z` | Undo / redo |
@@ -197,6 +199,23 @@ know:
 
 Boxes snap to their neighbours' edges and centres as you drag, with guides, so
 a row of passives lines up without fighting the mouse.
+
+There is no tool palette on purpose. Figma needs one because it draws a dozen
+kinds of object; here there is exactly one, and a mode you can leave in the
+wrong state is a trap rather than a feature.
+
+### Photos that show only part of the board
+
+A close-up of one corner works. The photo is aligned as usual, and the engine
+works out which part of the reference it actually covers:
+
+- parts inside the photo are judged normally;
+- parts outside it are marked **Not in view** in grey, excluded from the
+  verdict, and counted in the summary (*"OK for 10 of 41 parts"*).
+
+It will not call a part missing because you did not photograph it. On a 50%
+crop of a board, 10 of 41 parts were checked, 31 reported as not in view, and
+zero false alarms were raised.
 
 ---
 

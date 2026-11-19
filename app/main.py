@@ -357,9 +357,11 @@ def run_inspection(
 
     for upload in files:
         started = time.perf_counter()
-        image = fit_to_reference(to_working_size(_read_upload(upload)), reference.shape)
+        image, content_mask = fit_to_reference(
+            to_working_size(_read_upload(upload)), reference.shape
+        )
 
-        result = inspect(reference, parts, image, sensitivity=preset)
+        result = inspect(reference, parts, image, sensitivity=preset, test_mask=content_mask)
         elapsed_ms = round((time.perf_counter() - started) * 1000, 1)
 
         run_id = storage.new_run_id()

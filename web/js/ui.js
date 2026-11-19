@@ -96,6 +96,8 @@ export function cssVar(name, fallback = '#888') {
 export function stateColour(state) {
   if (state === 'missing') return cssVar('--missing', '#fb5d6d');
   if (state === 'review') return cssVar('--review', '#f5a524');
+  // Grey, deliberately: an unjudged part must not read as a verdict.
+  if (state === 'not_visible') return cssVar('--text-dim', '#6b7c93');
   return cssVar('--ok', '#2bd47d');
 }
 

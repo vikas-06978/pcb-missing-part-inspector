@@ -310,6 +310,17 @@ SUGGEST = SuggestConfig()
 STATE_PRESENT = "present"
 STATE_MISSING = "missing"
 STATE_REVIEW = "review"
+STATE_NOT_VISIBLE = "not_visible"
+
+#: How much of a part's box the photograph must actually show before the
+#: engine is willing to judge it.
+#:
+#: A photo of half the board aligns perfectly well -- the features it contains
+#: are real -- but the other half has no evidence behind it. Calling those
+#: parts "missing" would be a confident lie, and calling them "present" an
+#: equally confident one. They are reported as unseen instead, and the summary
+#: says how many of the named parts were actually checked.
+MIN_PART_COVERAGE = 0.70
 
 APP_NAME = "PCB Missing-Component Inspector"
 APP_VERSION = "1.0.0"

@@ -43,8 +43,9 @@ class Alignment:
     translation_px: float = 0.0
     rotation_deg: float = 0.0
     scale: float = 1.0
-    board_correlation: float = 0.0     # whole-frame NCC after warping
+    board_correlation: float = 0.0     # NCC after warping, over the covered area
     quality: float = 0.0               # 0..1 confidence in the alignment
+    coverage: float = 1.0              # fraction of the reference the photo shows
     warnings: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
@@ -58,6 +59,7 @@ class Alignment:
             "scale": round(self.scale, 4),
             "board_correlation": round(self.board_correlation, 4),
             "quality": round(self.quality, 4),
+            "coverage": round(self.coverage, 4),
             "warnings": list(self.warnings),
         }
 
@@ -246,12 +248,47 @@ def warp_to_reference(
     )
 
 
-def _board_correlation(ref_gray: np.ndarray, warped_gray: np.ndarray) -> float:
-    """Zero-mean normalised correlation over the whole frame."""
-    a = ref_gray.astype(np.float32).ravel()
-    b = warped_gray.astype(np.float32).ravel()
-    a -= a.mean()
-    b -= b.mean()
+def coverage_mask(
+    test_shape: tuple[int, ...],
+    matrix: np.ndarray,
+    reference_shape: tuple[int, ...],
+    content_mask: np.ndarray | None = None,
+) -> np.ndarray:
+    """Which reference pixels the test photograph actually shows.
+
+    A photo of half the board still aligns perfectly well -- the features it
+    does contain are real. What changes is that half the reference has no
+    evidence behind it at all. Warping a solid white rectangle through the
+    same transform says exactly where that boundary falls, so the parts
+    outside it can be reported as unseen instead of guessed at.
+    """
+    solid = (
+        content_mask if content_mask is not None
+        else np.full(test_shape[:2], 255, dtype=np.uint8)
+    )
+    height, width = reference_shape[:2]
+    return cv2.warpPerspective(
+        solid, matrix, (width, height),
+        flags=cv2.INTER_NEAREST, borderMode=cv2.BORDER_CONSTANT, borderValue=0,
+    )
+
+
+def _board_correlation(
+    ref_gray: np.ndarray, warped_gray: np.ndarray, mask: np.ndarray | None = None
+) -> float:
+    """Zero-mean normalised correlation, restricted to the covered area.
+
+    Measuring over the whole frame would punish a partial photo for the region
+    it never claimed to show, and report a good alignment as a bad one.
+    """
+    if mask is not None and np.count_nonzero(mask) > 256:
+        a = ref_gray[mask > 0].astype(np.float32)
+        b = warped_gray[mask > 0].astype(np.float32)
+    else:
+        a = ref_gray.astype(np.float32).ravel()
+        b = warped_gray.astype(np.float32).ravel()
+    a = a - a.mean()
+    b = b - b.mean()
     denom = float(np.linalg.norm(a) * np.linalg.norm(b))
     if denom < 1e-6:
         return 0.0
@@ -307,7 +344,9 @@ def align(reference_bgr: np.ndarray, test_bgr: np.ndarray) -> Alignment:
         test_gray, matrix, (ref_gray.shape[1], ref_gray.shape[0]),
         flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE,
     )
-    correlation = _board_correlation(ref_gray, warped_gray)
+    visible = coverage_mask(test_gray.shape, matrix, ref_gray.shape)
+    coverage = float(np.count_nonzero(visible)) / float(visible.size)
+    correlation = _board_correlation(ref_gray, warped_gray, visible)
 
     scale, rotation, _, _, translation = _decompose(matrix)
 
@@ -333,5 +372,6 @@ def align(reference_bgr: np.ndarray, test_bgr: np.ndarray) -> Alignment:
         scale=scale,
         board_correlation=correlation,
         quality=quality,
+        coverage=coverage,
         warnings=warnings,
     )
