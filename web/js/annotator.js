@@ -177,7 +177,11 @@ export class Annotator {
       this.parts.push(part);
       added.push(part.id);
     }
-    this.selectedIds = new Set(added);
+    // Deliberately leave nothing selected. Auto-detect can add forty boxes at
+    // once; if they all arrived selected, one arrow key would move the whole
+    // board's annotation, and the canvas would be a wall of highlight before
+    // the operator has looked at anything.
+    this.selectedIds.clear();
     this._emit();
   }
 
@@ -838,7 +842,10 @@ export class Annotator {
       ctx.stroke();
       ctx.restore();
 
-      if (rect.w > 26 || selected || hovered) {
+      // A label needs the box to be wide enough to own the space under it,
+      // otherwise forty of them collide into noise. Selection and hover
+      // always win, because then the operator is asking about that one part.
+      if (selected || hovered || rect.w >= 54) {
         drawLabel(ctx, part.name || 'Unnamed', rect.x, rect.y, colour, {
           canvasWidth: this.view.width,
         });

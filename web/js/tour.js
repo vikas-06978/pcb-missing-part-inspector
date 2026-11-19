@@ -184,7 +184,11 @@ export function runTour(steps) {
 
     window.addEventListener('resize', reposition);
     window.addEventListener('keydown', onKey, true);
-    backdrop.addEventListener('click', () => close(false));
+
+    // Deliberately NOT click-to-dismiss. This runs once, on someone's first
+    // minute with the app, and a stray click on the backdrop would throw the
+    // explanation away for good. Leaving is explicit: Skip, or Escape.
+    backdrop.addEventListener('click', (event) => event.stopPropagation());
 
     render();
   });
