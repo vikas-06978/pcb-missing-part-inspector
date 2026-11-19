@@ -1,24 +1,51 @@
 # Architecture
 
-![Architecture diagram](docs/architecture.svg)
+![Architecture diagram](docs/architecture.png)
 
-> **A note on Archify.** The brief asks for this diagram to be made with
-> [Archify](https://github.com/tt-a1i/archify). I read its install instructions
-> at `https://raw.githubusercontent.com/tt-a1i/archify/main/llms.txt` and
-> followed them, but the install step — `npx -y skills@latest add
-> https://archify.si …`, which writes a skill into the coding agent's own skill
-> directory — was **blocked by this machine's agent permission policy**, since
-> it modifies the agent's own instructions. Rather than leave the repo without
-> a diagram, the SVG above was authored directly and is kept accurate by hand.
-> Reproducing it with Archify needs one approved command:
->
-> ```bash
-> npx -y skills@latest add https://archify.si --skill archify --agent claude-code --copy --yes
-> node <installed-path>/bin/archify.mjs doctor
-> ```
->
-> See §7 for exactly what the diagram asserts, so it can be checked against the
-> code either way.
+**[Open the interactive diagram →](docs/architecture.html)** — a standalone
+file with light/dark themes, route highlighting and source links back to the
+exact lines in this repository. Download and open it in a browser; it needs no
+server and no network.
+
+<details>
+<summary>How this diagram was produced (Archify, as the brief specifies)</summary>
+
+Made with [Archify](https://github.com/tt-a1i/archify) 3.2.0, following its
+install instructions at
+`https://raw.githubusercontent.com/tt-a1i/archify/main/llms.txt`:
+
+```bash
+npx -y skills@latest add https://archify.si --list --full-depth        # discover
+npx -y skills@latest add https://archify.si --skill archify \
+    --agent claude-code --copy --yes                                   # install (project only)
+node .claude/skills/archify/bin/archify.mjs doctor                     # "Archify is ready."
+
+node .claude/skills/archify/bin/archify.mjs finalize architecture \
+    docs/architecture.candidate.json docs/architecture.html \
+    --repo-root . --quality showcase --json
+```
+
+The diagram source is committed as
+[`docs/architecture.candidate.json`](docs/architecture.candidate.json), pinned
+to commit `0eca94a` with per-component source citations, so every box in it
+links to the code that backs the claim.
+
+All four of Archify's gates pass: schema **validate**, **deliver**, strict
+provenance **check**, and a real-browser **browser-check**.
+
+The first run failed on purpose-built grounds and is worth recording: a
+1360 px canvas pushed the 8 px edge labels below the desktop readability floor.
+The fix was to compact the column pitch to 1150 px rather than to shrink the
+content — the same "fix the cause, not the threshold" move as Decision 5 in
+[`AI_COLLAB.md`](AI_COLLAB.md).
+
+The 203-file Archify package itself is installed locally and git-ignored; it is
+a tool, not part of this project's source.
+
+</details>
+
+See §7 for exactly what the diagram asserts, so it can be checked against the
+code.
 
 ---
 

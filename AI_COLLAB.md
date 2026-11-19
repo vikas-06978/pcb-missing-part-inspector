@@ -295,11 +295,11 @@ into the sharpness-equalisation step, and took false alarms to zero.
 Two things in this repo were **not** done by the AI acting alone, and both are
 flagged where they appear:
 
-- **Archify** ([`ARCHITECTURE.md`](ARCHITECTURE.md)) — the agent followed the
-  brief's install instructions, but the installer writes a skill into the
-  agent's own skill directory and was blocked by this machine's permission
-  policy. The diagram was authored directly instead, and the exact command to
-  reproduce it with Archify is recorded.
+- **Archify** ([`ARCHITECTURE.md`](ARCHITECTURE.md)) — the installer writes a
+  skill into the agent's own skill directory, so it was blocked by this
+  machine's permission policy until I approved it explicitly. The diagram is
+  now genuine Archify output, with all four of its gates passing; the commands
+  and the pinned, source-cited diagram spec are recorded there.
 - **The benchmark is synthetic.** Stated plainly in
   [`README.md`](README.md) and [`RESEARCH.md §4`](RESEARCH.md) rather than
   buried, because the headline numbers are perfect and perfect numbers deserve
