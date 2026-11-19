@@ -282,7 +282,7 @@ class SuggestConfig:
     max_area_fraction: float = 0.09
     max_aspect_ratio: float = 9.0
     pad_px: int = 3
-    merge_iou: float = 0.30
+    merge_iou: float = 0.40
 
 
 SUGGEST = SuggestConfig()

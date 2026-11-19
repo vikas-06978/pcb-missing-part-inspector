@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PCB Inspector</title>
+<meta name="description" content="Offline missing-component detection on PCBs by golden-board comparison.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+
+<div class="aurora" aria-hidden="true">
+  <span class="aurora__blob aurora__blob--a"></span>
+  <span class="aurora__blob aurora__blob--b"></span>
+  <span class="aurora__blob aurora__blob--c"></span>
+</div>
+
+<header class="appbar">
+  <div class="appbar__brand">
+    <svg class="mark" viewBox="0 0 40 40" aria-hidden="true">
+      <defs>
+        <linearGradient id="markGradient" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="var(--brand)"/>
+          <stop offset="100%" stop-color="var(--brand-alt)"/>
+        </linearGradient>
+      </defs>
+      <rect x="2.5" y="2.5" width="35" height="35" rx="9"
+            fill="none" stroke="url(#markGradient)" stroke-width="2.4"/>
+      <path class="mark__trace" d="M9 26 H16 L21 14 H31"
+            fill="none" stroke="url(#markGradient)" stroke-width="2.4"
+            stroke-linecap="round" stroke-linejoin="round"/>
+      <circle class="mark__node" cx="9" cy="26" r="2.9" fill="url(#markGradient)"/>
+      <circle class="mark__node" cx="31" cy="14" r="2.9" fill="url(#markGradient)"/>
+    </svg>
+    <div class="appbar__titles">
+      <h1>PCB&nbsp;Inspector</h1>
+      <button id="project-name" class="appbar__project" type="button"
+              title="Click to rename this board">Untitled board</button>
+    </div>
+  </div>
+
+  <nav class="stepper" id="stepper" aria-label="Workflow">
+    <button class="stepper__item is-active" data-step="reference" type="button">
+      <span class="stepper__num">1</span>
+      <span class="stepper__text"><b>Reference</b><i>Golden board photo</i></span>
+    </button>
+    <span class="stepper__rule" aria-hidden="true"></span>
+    <button class="stepper__item" data-step="parts" type="button">
+      <span class="stepper__num">2</span>
+      <span class="stepper__text"><b>Parts</b><i>Name each component</i></span>
+    </button>
+    <span class="stepper__rule" aria-hidden="true"></span>
+    <button class="stepper__item" data-step="inspect" type="button">
+      <span class="stepper__num">3</span>
+      <span class="stepper__text"><b>Inspect</b><i>Check new boards</i></span>
+    </button>
+  </nav>
+
+  <div class="appbar__actions">
+    <label class="field field--inline" title="How readily a part is called missing">
+      <span class="field__label">Sensitivity</span>
+      <select id="sensitivity" class="select"></select>
+    </label>
+    <button id="theme-toggle" class="icon-btn" type="button" title="Switch theme" aria-label="Switch theme">
+      <svg viewBox="0 0 24 24" class="icon-sun" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.6M12 18.8v2.6M2.6 12h2.6M18.8 12h2.6M5.3 5.3l1.9 1.9M16.8 16.8l1.9 1.9M18.7 5.3l-1.9 1.9M7.2 16.8l-1.9 1.9"/></svg>
+      <svg viewBox="0 0 24 24" class="icon-moon" aria-hidden="true"><path d="M20 14.2A8.2 8.2 0 0 1 9.8 4 8.4 8.4 0 1 0 20 14.2Z"/></svg>
+    </button>
+    <div class="menu">
+      <button id="menu-btn" class="icon-btn" type="button" aria-haspopup="true" aria-expanded="false" title="More" aria-label="More actions">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5.5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="18.5" r="1.8"/></svg>
+      </button>
+      <div class="menu__panel" id="menu-panel" role="menu">
+        <button data-action="new" role="menuitem">New board</button>
+        <button data-action="export" role="menuitem">Export setup&hellip;</button>
+        <button data-action="import" role="menuitem">Import setup&hellip;</button>
+        <div class="menu__sep"></div>
+        <button data-action="clear-runs" role="menuitem">Clear inspection history</button>
+        <div class="menu__sep"></div>
+        <button data-action="about" role="menuitem">About &amp; shortcuts</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- ================= STEP 1 : REFERENCE ================= -->
+  <section class="panel" id="step-reference" data-step="reference">
+    <header class="panel__head">
+      <div>
+        <h2>Upload the golden board</h2>
+        <p>One clear photo of a board you know is complete. Every later photo is
+           compared against this one, so take it in the position the line camera
+           will use.</p>
+      </div>
+    </header>
+
+    <div class="reference-layout">
+      <div class="dropzone" id="reference-drop" tabindex="0" role="button"
+           aria-label="Upload reference photo">
+        <svg class="dropzone__icon" viewBox="0 0 48 48" aria-hidden="true">
+          <path d="M24 32V14m0 0-7 7m7-7 7 7"/>
+          <path d="M8 30v6a4 4 0 0 0 4 4h24a4 4 0 0 0 4-4v-6"/>
+        </svg>
+        <p class="dropzone__title">Drop the reference photo here</p>
+        <p class="dropzone__hint">or <u>browse</u> &middot; JPEG, PNG, BMP, WEBP, TIFF &middot; you can also paste</p>
+      </div>
+
+      <aside class="card card--guide">
+        <h3>For a dependable reference</h3>
+        <ul class="guide-list">
+          <li><b>Fill the frame</b> with the board, square to the camera.</li>
+          <li><b>Even light</b>, no hard shadow across components.</li>
+          <li><b>In focus</b> — small passives must be sharp.</li>
+          <li><b>Same viewpoint</b> for every photo you inspect later.</li>
+        </ul>
+        <p class="note">Nothing leaves this machine. Photos are processed locally
+           and stored in the app's own folder.</p>
+      </aside>
+    </div>
+
+    <div class="reference-preview is-hidden" id="reference-preview">
+      <div class="preview-frame">
+        <img id="reference-img" alt="Reference board">
+      </div>
+      <div class="preview-meta">
+        <h3>Reference loaded</h3>
+        <dl class="meta-list">
+          <div><dt>File</dt><dd id="reference-filename">&mdash;</dd></div>
+          <div><dt>Size</dt><dd id="reference-size">&mdash;</dd></div>
+          <div><dt>Named parts</dt><dd id="reference-parts">0</dd></div>
+        </dl>
+        <div class="row">
+          <button class="btn btn--primary" id="to-parts" type="button">Name the parts</button>
+          <button class="btn btn--ghost" id="replace-reference" type="button">Replace photo</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= STEP 2 : PARTS ================= -->
+  <section class="panel is-hidden" id="step-parts" data-step="parts">
+    <header class="panel__head">
+      <div>
+        <h2>Name every part you want checked</h2>
+        <p>Drag a box around a component, then give it the name the operator will
+           see. You only do this once per board.</p>
+      </div>
+      <div class="row">
+        <button class="btn btn--ghost" id="suggest-parts" type="button">
+          <svg viewBox="0 0 24 24" class="btn__icon" aria-hidden="true"><path d="m12 3 2.1 5.2L19.5 10l-5.4 1.8L12 17l-2.1-5.2L4.5 10l5.4-1.8Z"/><path d="M18.5 15.5 19.4 18l2.5.9-2.5.9-.9 2.5-.9-2.5-2.5-.9 2.5-.9Z"/></svg>
+          Auto-detect
+        </button>
+        <button class="btn btn--primary" id="to-inspect" type="button">Done — start inspecting</button>
+      </div>
+    </header>
+
+    <div class="editor">
+      <div class="editor__stage">
+        <div class="stage-toolbar">
+          <div class="toolgroup">
+            <button class="icon-btn icon-btn--sm" id="zoom-out" type="button" title="Zoom out (−)" aria-label="Zoom out">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.4"/><path d="M8.2 11h5.6M20 20l-4.4-4.4"/></svg>
+            </button>
+            <span class="zoom-readout" id="zoom-readout">100%</span>
+            <button class="icon-btn icon-btn--sm" id="zoom-in" type="button" title="Zoom in (+)" aria-label="Zoom in">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.4"/><path d="M8.2 11h5.6M11 8.2v5.6M20 20l-4.4-4.4"/></svg>
+            </button>
+            <button class="icon-btn icon-btn--sm" id="zoom-fit" type="button" title="Fit to window (0)" aria-label="Fit to window">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+            </button>
+          </div>
+          <p class="stage-hint">Drag on the board to add a part &middot; double-click a box to rename &middot; <kbd>Del</kbd> removes</p>
+          <div class="toolgroup">
+            <button class="btn btn--ghost btn--sm" id="clear-parts" type="button">Clear all</button>
+          </div>
+        </div>
+        <div class="canvas-host" id="canvas-host">
+          <canvas id="annotator"></canvas>
+          <div class="canvas-empty" id="canvas-empty">
+            <p>Drag a rectangle around the first component.</p>
+          </div>
+        </div>
+      </div>
+
+      <aside class="editor__side">
+        <div class="side-head">
+          <h3>Parts <span class="count-pill" id="parts-count">0</span></h3>
+          <button class="btn btn--ghost btn--sm" id="rename-all" type="button" title="Give every part a sequential name">Auto-name</button>
+        </div>
+        <ul class="part-list" id="part-list"></ul>
+        <div class="side-empty" id="parts-empty">
+          <p>No parts yet.</p>
+          <p class="note">Draw a box on the board, or use <b>Auto-detect</b> to
+             propose boxes you can rename.</p>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ================= STEP 3 : INSPECT ================= -->
+  <section class="panel is-hidden" id="step-inspect" data-step="inspect">
+    <header class="panel__head">
+      <div>
+        <h2>Inspect boards</h2>
+        <p>Drop photos of the same board, taken the same way. Each one is
+           checked against the reference.</p>
+      </div>
+      <div class="row">
+        <button class="btn btn--ghost" id="back-to-parts" type="button">Edit parts</button>
+        <button class="btn btn--ghost" id="export-report" type="button" disabled>Export report</button>
+      </div>
+    </header>
+
+    <div class="dropzone dropzone--compact" id="test-drop" tabindex="0" role="button"
+         aria-label="Upload board photos">
+      <svg class="dropzone__icon" viewBox="0 0 48 48" aria-hidden="true">
+        <path d="M24 32V14m0 0-7 7m7-7 7 7"/>
+        <path d="M8 30v6a4 4 0 0 0 4 4h24a4 4 0 0 0 4-4v-6"/>
+      </svg>
+      <p class="dropzone__title">Drop board photos here</p>
+      <p class="dropzone__hint" id="test-drop-hint">or <u>browse</u> &middot; several at once is fine</p>
+    </div>
+
+    <div class="progress is-hidden" id="inspect-progress">
+      <div class="progress__bar"><span id="progress-fill"></span></div>
+      <p id="progress-label">Inspecting&hellip;</p>
+    </div>
+
+    <div class="batch-summary is-hidden" id="batch-summary"></div>
+    <div class="results" id="results"></div>
+
+    <div class="empty-state" id="inspect-empty">
+      <svg viewBox="0 0 64 64" aria-hidden="true" class="empty-state__art">
+        <rect x="8" y="12" width="48" height="40" rx="5"/>
+        <path d="M18 34h8l4-9 5 15 4-8h7"/>
+      </svg>
+      <p>No boards inspected yet.</p>
+    </div>
+  </section>
+</main>
+
+<!-- ================= DETAIL DIALOG ================= -->
+<dialog class="detail" id="detail">
+  <div class="detail__head">
+    <div>
+      <h2 id="detail-title">Board</h2>
+      <p id="detail-sub" class="detail__sub"></p>
+    </div>
+    <div class="row">
+      <div class="segmented" id="detail-view" role="group" aria-label="Image view">
+        <button data-view="overlay" class="is-active" type="button">Result</button>
+        <button data-view="compare" type="button">Compare</button>
+      </div>
+      <button class="icon-btn" id="detail-close" type="button" title="Close" aria-label="Close">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="detail__body">
+    <div class="detail__stage">
+      <div class="viewer" id="viewer">
+        <canvas id="detail-canvas"></canvas>
+        <div class="compare-handle is-hidden" id="compare-handle">
+          <span class="compare-handle__grip"></span>
+          <span class="compare-handle__tag compare-handle__tag--l">Reference</span>
+          <span class="compare-handle__tag compare-handle__tag--r">This board</span>
+        </div>
+      </div>
+      <div class="legend">
+        <span><i class="dot dot--ok"></i>Present</span>
+        <span><i class="dot dot--review"></i>Needs review</span>
+        <span><i class="dot dot--missing"></i>Missing</span>
+      </div>
+    </div>
+
+    <aside class="detail__side">
+      <div class="verdict" id="detail-verdict"></div>
+      <div class="diagnostics" id="detail-diagnostics"></div>
+      <h3 class="side-title">Parts</h3>
+      <ul class="verdict-list" id="verdict-list"></ul>
+    </aside>
+  </div>
+</dialog>
+
+<!-- ================= ABOUT DIALOG ================= -->
+<dialog class="sheet" id="about">
+  <h2>PCB Inspector</h2>
+  <p class="sheet__lead">Missing-component detection by golden-board comparison.
+     Classical computer vision, no training data, and no network access at
+     runtime.</p>
+  <h3>How it decides</h3>
+  <ol class="sheet__steps">
+    <li>Aligns your photo onto the reference (feature matching, then intensity alignment).</li>
+    <li>Equalises exposure and focus so only real differences remain.</li>
+    <li>Measures six independent signals inside each named box.</li>
+    <li>Fuses them into one confidence, then applies presence vetoes.</li>
+  </ol>
+  <h3>Keyboard</h3>
+  <table class="sheet__keys">
+    <tr><td><kbd>Del</kbd></td><td>Delete the selected part</td></tr>
+    <tr><td><kbd>F2</kbd></td><td>Rename the selected part</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>Undo</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td><td>Redo</td></tr>
+    <tr><td><kbd>+</kbd> <kbd>−</kbd> <kbd>0</kbd></td><td>Zoom in, out, fit</td></tr>
+    <tr><td><kbd>Space</kbd>+drag</td><td>Pan the board</td></tr>
+    <tr><td><kbd>Esc</kbd></td><td>Deselect or close</td></tr>
+  </table>
+  <div class="row row--end">
+    <button class="btn btn--primary" data-close type="button">Close</button>
+  </div>
+</dialog>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<input type="file" id="file-reference" accept="image/*" hidden>
+<input type="file" id="file-tests" accept="image/*" multiple hidden>
+<input type="file" id="file-import" accept="application/json,.json" hidden>
+
+<script type="module" src="/static/js/app.js"></script>
+</body>
+</html>

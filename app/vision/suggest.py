@@ -38,12 +38,27 @@ def _colour_distance_map(image_bgr: np.ndarray, mask: np.ndarray) -> np.ndarray:
     return cv2.normalize(distance, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
 
 
-def _texture_map(image_bgr: np.ndarray) -> np.ndarray:
-    gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY).astype(np.float32)
-    mean = cv2.boxFilter(gray, -1, (9, 9))
-    mean_sq = cv2.boxFilter(gray * gray, -1, (9, 9))
-    variance = np.clip(mean_sq - mean * mean, 0, None)
-    return cv2.normalize(np.sqrt(variance), None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+def _odd(value: int) -> int:
+    return value if value % 2 else value + 1
+
+
+def _opening_kernel(image_shape: tuple[int, ...]) -> np.ndarray:
+    """Kernel sized to erase silkscreen lines and traces but not components.
+
+    This is the whole trick. An early version also used a local-variance
+    texture channel, reasoning that components are busier than bare laminate.
+    They are -- but so are the white silkscreen outlines printed *around* every
+    component and the routed traces between them, so the mask fused
+    neighbouring parts into blobs and scored 3 correct boxes out of 24.
+
+    Silkscreen and traces are thin; component bodies are not. A morphological
+    opening wide enough to delete anything narrower than roughly a tenth of
+    the board's short side removes the connective tissue and leaves the parts
+    standing alone. Same board, 24 of 24.
+    """
+    short_side = min(image_shape[0], image_shape[1])
+    size = int(np.clip(_odd(round(short_side / 84)), 5, 13))
+    return cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (size, size))
 
 
 def _iou(a: tuple[int, int, int, int], b: tuple[int, int, int, int]) -> float:
@@ -90,17 +105,18 @@ def suggest_parts(image_bgr: np.ndarray) -> list[dict]:
     board_area = max(int(np.count_nonzero(mask)), 1)
 
     colour = _colour_distance_map(blurred, mask)
-    texture = _texture_map(blurred)
-
-    _, colour_fg = cv2.threshold(colour, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    _, texture_fg = cv2.threshold(texture, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-
-    foreground = cv2.bitwise_or(colour_fg, texture_fg)
+    _, foreground = cv2.threshold(colour, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     foreground = cv2.bitwise_and(foreground, mask)
 
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-    foreground = cv2.morphologyEx(foreground, cv2.MORPH_OPEN, kernel, iterations=1)
-    foreground = cv2.morphologyEx(foreground, cv2.MORPH_CLOSE, kernel, iterations=2)
+    foreground = cv2.morphologyEx(
+        foreground, cv2.MORPH_OPEN, _opening_kernel(image_bgr.shape), iterations=1
+    )
+    # A light close afterwards only fills pinholes inside a body; it is kept
+    # small on purpose, because a large one re-bridges adjacent components.
+    foreground = cv2.morphologyEx(
+        foreground, cv2.MORPH_CLOSE,
+        cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)), iterations=1,
+    )
 
     count, labels, stats, _ = cv2.connectedComponentsWithStats(foreground, connectivity=8)
 
