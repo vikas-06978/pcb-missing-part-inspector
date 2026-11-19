@@ -27,3 +27,11 @@ desktop.ini
 # The 80-board stress set is not: regenerate it with
 #   python tools/generate_samples.py --stress 80 --out samples_stress
 samples_stress/
+
+# ---- archify (third-party skill package, installed locally) ----
+# Installed with:
+#   npx -y skills@latest add https://archify.si --skill archify --agent claude-code --copy --yes
+# 203 vendor files; not part of this project's source.
+.agents/
+.claude/skills/
+.archify/
