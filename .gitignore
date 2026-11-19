@@ -21,7 +21,9 @@ desktop.ini
 .vscode/
 *.swp
 
-# ---- keep generated sample imagery out of git history noise ----
-# (regenerate with: python tools/generate_samples.py)
-samples/boards/
-samples/*.zip
+# ---- sample data ----
+# samples/ IS committed: 10 boards is small, and it means a reviewer can run
+# the evaluation immediately without generating anything.
+# The 80-board stress set is not: regenerate it with
+#   python tools/generate_samples.py --stress 80 --out samples_stress
+samples_stress/

@@ -140,72 +140,58 @@ def best_offset_ncc(
 # --------------------------------------------------------------------------
 
 
-def canny_thresholds(reference_gray: np.ndarray, sigma: float = 0.33) -> tuple[int, int]:
-    """Derive Canny thresholds from the *reference* patch only.
+def gradient_magnitude(gray: np.ndarray) -> np.ndarray:
+    gx = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3)
+    gy = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
+    return cv2.magnitude(gx, gy)
 
-    Both patches are then edged with the same thresholds. Deriving them
-    per-image would adapt the detector to the very change we are trying to
-    measure, which quietly destroys the signal.
+
+def _zero_mean_correlation(a: np.ndarray, b: np.ndarray) -> float:
+    av = a.astype(np.float32).ravel()
+    bv = b.astype(np.float32).ravel()
+    av = av - av.mean()
+    bv = bv - bv.mean()
+    denom = float(np.linalg.norm(av) * np.linalg.norm(bv))
+    if denom < 1e-6:
+        # One of the patches is perfectly flat. There is no structure to agree
+        # or disagree about, so this channel abstains rather than guesses.
+        return 1.0
+    return float(np.clip(float(np.dot(av, bv)) / denom, -1.0, 1.0))
+
+
+def edge_correlation(reference_gray: np.ndarray, test_gray: np.ndarray) -> float:
+    """Correlation between the two patches' gradient-magnitude maps.
+
+    This replaced a dilated-Canny IoU, which measured well on crisp photos and
+    then collapsed the moment the lens went slightly soft: blur pushes
+    gradients under the Canny threshold, the test edge map empties out, and a
+    perfectly present component reads as absent. On the evaluation set that
+    single failure mode produced most of the false alarms.
+
+    Correlating gradient magnitudes fixes it, because blur scales the whole
+    gradient field down roughly uniformly and correlation is invariant to
+    scale. What it still punishes is structure appearing in *different*
+    places -- which is exactly what a removal looks like.
     """
-    median = float(np.median(reference_gray))
-    low = int(max(0, (1.0 - sigma) * median))
-    high = int(min(255, (1.0 + sigma) * median))
+    return _zero_mean_correlation(
+        gradient_magnitude(reference_gray), gradient_magnitude(test_gray)
+    )
+
+
+def edge_density(gray: np.ndarray) -> float:
+    """Fraction of pixels Canny calls an edge. Reported for diagnostics only."""
+    median = float(np.median(gray))
+    low = int(max(0, 0.67 * median))
+    high = int(min(255, 1.33 * median))
     if high <= low:
         low, high = 50, 150
-    return low, high
-
-
-def edge_iou(
-    reference_gray: np.ndarray,
-    test_gray: np.ndarray,
-    dilate_px: int = ANALYSIS.edge_dilate_px,
-) -> tuple[float, float, float]:
-    """Intersection-over-union of dilated edge maps.
-
-    Returns ``(iou, reference_edge_density, test_edge_density)``.
-
-    A component is a silhouette: body outline, lead edges, printed markings.
-    Remove it and that structure is replaced by bare laminate and two pads.
-    IoU of slightly dilated edges tolerates a pixel of jitter while still
-    collapsing when the structure genuinely changes.
-    """
-    low, high = canny_thresholds(reference_gray)
-
-    ref_edges = cv2.Canny(reference_gray, low, high)
-    test_edges = cv2.Canny(test_gray, low, high)
-
-    if dilate_px > 0:
-        k = cv2.getStructuringElement(
-            cv2.MORPH_ELLIPSE, (2 * dilate_px + 1, 2 * dilate_px + 1)
-        )
-        ref_d = cv2.dilate(ref_edges, k)
-        test_d = cv2.dilate(test_edges, k)
-    else:
-        ref_d, test_d = ref_edges, test_edges
-
-    ref_bin = ref_d > 0
-    test_bin = test_d > 0
-
-    union = np.count_nonzero(ref_bin | test_bin)
-    intersection = np.count_nonzero(ref_bin & test_bin)
-
-    total = ref_bin.size
-    ref_density = float(np.count_nonzero(ref_edges)) / max(total, 1)
-    test_density = float(np.count_nonzero(test_edges)) / max(total, 1)
-
-    if union == 0:
-        # Neither patch has structure (e.g. a flat painted area). That is not
-        # evidence of a removal, so report perfect agreement.
-        return 1.0, ref_density, test_density
-
-    return float(intersection) / float(union), ref_density, test_density
+    edges = cv2.Canny(gray, low, high)
+    return float(np.count_nonzero(edges)) / max(edges.size, 1)
 
 
 def gradient_energy(gray: np.ndarray) -> float:
     """Mean gradient magnitude -- a scale-free proxy for "how much is here"."""
-    gx = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3)
-    gy = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
-    return float(np.sqrt(gx * gx + gy * gy).mean())
+    return float(gradient_magnitude(gray).mean())
 
 
 def gradient_log_ratio(reference_gray: np.ndarray, test_gray: np.ndarray) -> float:
@@ -225,29 +211,55 @@ def gradient_log_ratio(reference_gray: np.ndarray, test_gray: np.ndarray) -> flo
 # --------------------------------------------------------------------------
 
 
-def hsv_hist_distance(reference_bgr: np.ndarray, test_bgr: np.ndarray) -> float:
-    """Bhattacharyya distance between hue/saturation histograms (0 = identical).
+def _chroma_bins(pixel_count: int) -> int:
+    """Histogram resolution scaled to how many samples the patch actually has.
 
-    Hue and saturation only -- value is deliberately dropped so that a brighter
-    or dimmer exposure does not register as a change. What it does catch is the
-    thing we care about: the patch turning into the colour of bare solder mask.
+    A 22x40 chip resistor gives 880 samples. Spread over 24x24 bins that is
+    1.5 samples per bin, and the resulting histogram measures sampling noise
+    rather than colour -- which is how a part that was plainly still there
+    ended up with a colour distance of 0.7.
+    """
+    return int(np.clip(round(np.sqrt(pixel_count) / 4.0), 8, ANALYSIS.chroma_bins))
+
+
+def _chroma_histogram(image_bgr: np.ndarray, bins: int) -> np.ndarray:
+    lab = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2LAB)
+    hist = cv2.calcHist([lab], [1, 2], None, [bins, bins], [0, 256, 0, 256])
+
+    # Smooth before comparing. Without it, two photographs of the *same* patch
+    # land their samples in neighbouring bins and the histograms barely
+    # overlap -- the comparison then measures quantisation, not colour.
+    hist = cv2.GaussianBlur(hist, (0, 0), ANALYSIS.chroma_smoothing)
+
+    total = float(hist.sum())
+    if total > 0:
+        hist /= total
+    return hist
+
+
+def colour_distance(reference_bgr: np.ndarray, test_bgr: np.ndarray) -> float:
+    """Bhattacharyya distance between CIELAB chroma histograms (0 = identical).
+
+    Chroma (a*, b*) only: lightness is dropped so a brighter or dimmer
+    exposure does not register as a change, while a patch turning into the
+    colour of bare solder mask does.
+
+    This started out as a hue/saturation histogram and was wrong in a way that
+    only the evaluation set revealed -- it returned ~1.0 for *identical*
+    patches. Hue is undefined for near-neutral colours, and a PCB is mostly
+    near-neutral: black IC bodies, white connectors, grey pads. Those hues
+    were noise, so two photos of the same part shared almost no bins. CIELAB
+    chroma degrades gracefully instead: neutrals simply cluster near the
+    origin, where they belong, and still overlap.
     """
     if reference_bgr.ndim == 2:
         reference_bgr = cv2.cvtColor(reference_bgr, cv2.COLOR_GRAY2BGR)
     if test_bgr.ndim == 2:
         test_bgr = cv2.cvtColor(test_bgr, cv2.COLOR_GRAY2BGR)
 
-    ref_hsv = cv2.cvtColor(reference_bgr, cv2.COLOR_BGR2HSV)
-    test_hsv = cv2.cvtColor(test_bgr, cv2.COLOR_BGR2HSV)
-
-    bins = [ANALYSIS.hist_bins_h, ANALYSIS.hist_bins_s]
-    ranges = [0, 180, 0, 256]
-
-    ref_hist = cv2.calcHist([ref_hsv], [0, 1], None, bins, ranges)
-    test_hist = cv2.calcHist([test_hsv], [0, 1], None, bins, ranges)
-
-    cv2.normalize(ref_hist, ref_hist, 0, 1, cv2.NORM_MINMAX)
-    cv2.normalize(test_hist, test_hist, 0, 1, cv2.NORM_MINMAX)
+    bins = _chroma_bins(reference_bgr.shape[0] * reference_bgr.shape[1])
+    ref_hist = _chroma_histogram(reference_bgr, bins)
+    test_hist = _chroma_histogram(test_bgr, bins)
 
     return float(cv2.compareHist(ref_hist, test_hist, cv2.HISTCMP_BHATTACHARYYA))
 

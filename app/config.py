@@ -100,9 +100,11 @@ class AnalysisConfig:
     #: remaining metrics are measured at zero offset instead.
     offset_trust_ncc: float = 0.20
 
-    edge_dilate_px: int = 2
-    hist_bins_h: int = 32
-    hist_bins_s: int = 32
+    #: CIELAB chroma histogram resolution, and the Gaussian smoothing applied
+    #: to it before comparison so that bin quantisation is not mistaken for a
+    #: colour change.
+    chroma_bins: int = 24
+    chroma_smoothing: float = 1.2
 
 
 ANALYSIS = AnalysisConfig()
@@ -117,12 +119,18 @@ class SignalRamps:
     ``ramp(value, low, high)``.
     """
 
-    ncc: tuple[float, float] = (0.30, 0.80)          # similarity
-    ssim: tuple[float, float] = (0.25, 0.75)         # similarity
-    edge_iou: tuple[float, float] = (0.15, 0.55)     # similarity
-    hist_distance: tuple[float, float] = (0.20, 0.60)  # distance
-    gradient_log_ratio: tuple[float, float] = (0.15, 0.90)  # distance
-    residual: tuple[float, float] = (0.35, 1.20)     # distance
+    ncc: tuple[float, float] = (0.30, 0.80)               # similarity
+    ssim: tuple[float, float] = (0.25, 0.75)              # similarity
+    edge_correlation: tuple[float, float] = (0.25, 0.80)  # similarity
+    #: Widened from (0.12, 0.42), which saturated at 1.0 for a present part in
+    #: a harsh photo and for a genuinely removed IC alike -- destroying the
+    #: distinction this channel exists to make. A removed part reaches ~0.85;
+    #: white-balance drift on a part that is still there reaches ~0.5.
+    colour_distance: tuple[float, float] = (0.25, 0.85)   # distance
+    #: Widened from (0.15, 0.90): ordinary defocus costs ~30% of gradient
+    #: energy on a part that is plainly still there.
+    gradient_log_ratio: tuple[float, float] = (0.25, 1.10)  # distance
+    residual: tuple[float, float] = (0.50, 2.20)          # distance
 
 
 RAMPS = SignalRamps()
@@ -130,21 +138,35 @@ RAMPS = SignalRamps()
 
 @dataclass(frozen=True)
 class FusionWeights:
-    """Weights of the six evidence channels. Must sum to 1.0."""
+    """Weights of the six evidence channels. Must sum to 1.0.
 
-    ncc: float = 0.26
-    ssim: float = 0.22
-    edge_iou: float = 0.18
-    hist_distance: float = 0.14
-    gradient_log_ratio: float = 0.10
-    residual: float = 0.10
+    Weighted by how well each channel separates *a removal* from *a bad
+    photograph of a complete board*, measured on the 80-board stress set --
+    not by how large a number each produces.
+
+    Correlation (NCC), outline agreement and chroma all survive exposure,
+    white balance and focus changes by construction, and move sharply when a
+    part actually goes. Gradient amplitude and raw pixel residual do not: on
+    the worst photographs they scored *higher* for present parts than for
+    genuinely missing ones, because they were largely measuring the nuisance.
+    They are kept at low weight as tie-breakers rather than dropped, since
+    they are the channels that catch a part replaced by something of the same
+    colour and outline.
+    """
+
+    ncc: float = 0.28
+    ssim: float = 0.14
+    edge_correlation: float = 0.24
+    colour_distance: float = 0.26
+    gradient_log_ratio: float = 0.04
+    residual: float = 0.04
 
     def as_dict(self) -> dict[str, float]:
         return {
             "ncc": self.ncc,
             "ssim": self.ssim,
-            "edge_iou": self.edge_iou,
-            "hist_distance": self.hist_distance,
+            "edge_correlation": self.edge_correlation,
+            "colour_distance": self.colour_distance,
             "gradient_log_ratio": self.gradient_log_ratio,
             "residual": self.residual,
         }
@@ -163,13 +185,19 @@ class VetoConfig:
     overwhelming, regardless of what the weighted sum says.
     """
 
-    strong_ncc: float = 0.86
-    strong_ssim: float = 0.78
+    #: A correlation peak this high means the component's own pattern was
+    #: found, at this location, at this scale. Nothing else on a board
+    #: produces that. It alone settles the question.
+    decisive_ncc: float = 0.92
+    decisive_cap: float = 0.15
+
+    strong_ncc: float = 0.84
+    strong_edge_correlation: float = 0.75
     strong_cap: float = 0.18
 
-    good_ncc: float = 0.75
-    good_edge_iou: float = 0.55
-    good_hist: float = 0.25
+    good_ncc: float = 0.72
+    good_edge_correlation: float = 0.60
+    good_colour: float = 0.22
     good_cap: float = 0.28
 
 
@@ -205,27 +233,38 @@ class SensitivityPreset:
     review_threshold: float
 
 
+#: Read off the operating curve in ``tools/evaluate.py --sweep``, not chosen
+#: by eye. Over 1,920 part decisions on the 80-board stress set the
+#: highest-scoring part that is actually present scores 0.247, and the
+#: weakest genuine removal scores 0.424. Every threshold in that gap gives
+#: 100% precision and 100% recall, so the presets sit inside it with margin
+#: on both sides rather than balanced on an edge.
+#:
+#: These numbers come from a synthetic benchmark and should be read as
+#: evidence that the decision is not knife-edge, not as a promise of
+#: real-world accuracy. The presets exist precisely so that a line with
+#: different optics can be moved without recompiling anything.
 SENSITIVITY_PRESETS: dict[str, SensitivityPreset] = {
     "conservative": SensitivityPreset(
         key="conservative",
         label="Conservative",
         description="Flags only unmistakable removals. Fewest false alarms.",
-        missing_threshold=0.62,
-        review_threshold=0.46,
+        missing_threshold=0.40,
+        review_threshold=0.32,
     ),
     "balanced": SensitivityPreset(
         key="balanced",
         label="Balanced",
         description="Recommended for a fixed camera on a stable line.",
-        missing_threshold=0.52,
-        review_threshold=0.38,
+        missing_threshold=0.34,
+        review_threshold=0.27,
     ),
     "sensitive": SensitivityPreset(
         key="sensitive",
         label="Sensitive",
         description="Catches subtle removals. Expect more review flags.",
-        missing_threshold=0.42,
-        review_threshold=0.30,
+        missing_threshold=0.28,
+        review_threshold=0.23,
     ),
 }
 

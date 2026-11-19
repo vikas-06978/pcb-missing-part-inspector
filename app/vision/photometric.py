@@ -118,3 +118,94 @@ def match_levels(
         ),
     }
     return corrected, report
+
+
+# --------------------------------------------------------------------------
+# Sharpness
+# --------------------------------------------------------------------------
+
+
+def _focus_measure(gray: np.ndarray) -> float:
+    """Variance of the Laplacian -- the standard cheap sharpness estimate.
+
+    Median-filtered first because sensor noise is high-frequency too, and an
+    unfiltered noisy photo reads as *sharper* than a clean one.
+    """
+    denoised = cv2.medianBlur(gray, 3)
+    return float(cv2.Laplacian(denoised, cv2.CV_32F).var())
+
+
+def match_sharpness(
+    reference_bgr: np.ndarray,
+    test_bgr: np.ndarray,
+    tolerance: float = 0.92,
+    max_sigma: float = 2.6,
+) -> tuple[np.ndarray, np.ndarray, dict[str, float]]:
+    """Blur whichever image is sharper until both are equally soft.
+
+    The reference is a careful, well-focused shot taken once. Line photos are
+    not: autofocus hunts, the board sits a millimetre higher in the fixture,
+    the lens is cheap. Comparing a sharp patch against a soft one inflates
+    every difference measure, and it does so worst on exactly the parts that
+    are hardest anyway -- small, dark components ringed by bright solder pads,
+    where blur bleeds the pads into the body.
+
+    On the 80-board stress set this single failure mode produced *every*
+    false alarm at conservative sensitivity: one 22x40 px chip resistor,
+    flagged on boards where nothing at all had been removed.
+
+    Equalising sharpness is a nuisance correction in exactly the same sense as
+    equalising exposure. It throws away detail that one of the two images
+    never had, which is the point: a comparison may only use information that
+    both sides actually contain.
+    """
+    ref_gray = cv2.cvtColor(reference_bgr, cv2.COLOR_BGR2GRAY)
+    test_gray = cv2.cvtColor(test_bgr, cv2.COLOR_BGR2GRAY)
+
+    # The search runs on a downscaled copy: sharpness is a global property and
+    # 23 Gaussian blurs of a full-resolution board would dominate the runtime.
+    scale = min(1.0, 700.0 / max(ref_gray.shape[:2]))
+    if scale < 1.0:
+        size = (int(ref_gray.shape[1] * scale), int(ref_gray.shape[0] * scale))
+        ref_small = cv2.resize(ref_gray, size, interpolation=cv2.INTER_AREA)
+        test_small = cv2.resize(test_gray, size, interpolation=cv2.INTER_AREA)
+    else:
+        ref_small, test_small = ref_gray, test_gray
+
+    focus_ref = _focus_measure(ref_small)
+    focus_test = _focus_measure(test_small)
+
+    report = {
+        "reference_focus": focus_ref,
+        "test_focus": focus_test,
+        "blur_applied_to": 0.0,   # -1 = test blurred, +1 = reference blurred
+        "sigma": 0.0,
+    }
+
+    if focus_ref <= 0 or focus_test <= 0:
+        return reference_bgr, test_bgr, report
+
+    if focus_test < focus_ref * tolerance:
+        sharper, target, blur_reference = ref_small, focus_test, True
+    elif focus_ref < focus_test * tolerance:
+        sharper, target, blur_reference = test_small, focus_ref, False
+    else:
+        return reference_bgr, test_bgr, report
+
+    best_sigma, best_error = 0.0, float("inf")
+    for sigma in np.arange(0.3, max_sigma, 0.1):
+        error = abs(_focus_measure(cv2.GaussianBlur(sharper, (0, 0), float(sigma))) - target)
+        if error < best_error:
+            best_sigma, best_error = float(sigma), error
+
+    if best_sigma <= 0.0:
+        return reference_bgr, test_bgr, report
+
+    # The sigma was found on the downscaled copy; scale it back up.
+    full_sigma = best_sigma / scale if scale > 0 else best_sigma
+    report["sigma"] = round(full_sigma, 3)
+    report["blur_applied_to"] = 1.0 if blur_reference else -1.0
+
+    if blur_reference:
+        return cv2.GaussianBlur(reference_bgr, (0, 0), full_sigma), test_bgr, report
+    return reference_bgr, cv2.GaussianBlur(test_bgr, (0, 0), full_sigma), report

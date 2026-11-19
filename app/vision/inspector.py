@@ -42,15 +42,15 @@ from app.config import (
     WEIGHTS,
 )
 from app.vision import metrics as M
-from app.vision.photometric import board_mask, match_levels
+from app.vision.photometric import board_mask, match_levels, match_sharpness
 from app.vision.registration import Alignment, align, warp_to_reference
 
 # Human-readable explanation for each evidence channel when it fires.
 SIGNAL_LABELS: dict[str, tuple[str, str]] = {
     "ncc": ("Template match", "the part's pattern is no longer found here"),
     "ssim": ("Structure", "the local structure no longer matches the reference"),
-    "edge_iou": ("Outline", "the component outline is absent"),
-    "hist_distance": ("Colour", "the colour now reads as bare board, not the part"),
+    "edge_correlation": ("Outline", "the component outline is absent"),
+    "colour_distance": ("Colour", "the colour now reads as bare board, not the part"),
     "gradient_log_ratio": ("Texture", "surface texture and markings are gone"),
     "residual": ("Pixel difference", "the pixels differ strongly from the reference"),
 }
@@ -79,6 +79,7 @@ class InspectionResult:
     verdicts: list[PartVerdict]
     alignment: Alignment
     photometric: dict[str, float]
+    sharpness: dict[str, float]
     scene_compensation: float
     sensitivity: str
     thresholds: dict[str, float]
@@ -200,18 +201,16 @@ def _analyse_part(
     ref_gray = M.to_gray(ref_small)
     test_gray = M.to_gray(test_small)
 
-    iou, ref_density, test_density = M.edge_iou(ref_gray, test_gray)
-
     signals = {
         "ncc": float(ncc),
         "ssim": M.ssim(ref_gray, test_gray),
-        "edge_iou": float(iou),
-        "ref_edge_density": float(ref_density),
-        "test_edge_density": float(test_density),
-        "hist_distance": M.hsv_hist_distance(ref_small, test_small),
+        "edge_correlation": M.edge_correlation(ref_gray, test_gray),
+        "colour_distance": M.colour_distance(ref_small, test_small),
         "gradient_log_ratio": M.gradient_log_ratio(ref_gray, test_gray),
         "residual": M.normalised_residual(ref_gray, test_gray),
         "intensity_shift": M.mean_intensity_shift(ref_gray, test_gray),
+        "ref_edge_density": M.edge_density(ref_gray),
+        "test_edge_density": M.edge_density(test_gray),
         "ref_contrast": float(ref_gray.std()),
         "test_contrast": float(test_gray.std()),
     }
@@ -219,8 +218,10 @@ def _analyse_part(
     scores = {
         "ncc": M.inv_ramp(signals["ncc"], *RAMPS.ncc),
         "ssim": M.inv_ramp(signals["ssim"], *RAMPS.ssim),
-        "edge_iou": M.inv_ramp(signals["edge_iou"], *RAMPS.edge_iou),
-        "hist_distance": M.ramp(signals["hist_distance"], *RAMPS.hist_distance),
+        "edge_correlation": M.inv_ramp(
+            signals["edge_correlation"], *RAMPS.edge_correlation
+        ),
+        "colour_distance": M.ramp(signals["colour_distance"], *RAMPS.colour_distance),
         "gradient_log_ratio": M.ramp(
             signals["gradient_log_ratio"], *RAMPS.gradient_log_ratio
         ),
@@ -236,17 +237,22 @@ def _fuse(signals: dict[str, float], scores: dict[str, float]) -> float:
     confidence = sum(weights[k] * scores[k] for k in weights)
 
     # A single overwhelming channel should not be averaged into silence.
-    strongest = max(scores["ncc"], scores["ssim"], scores["edge_iou"])
+    strongest = max(scores["ncc"], scores["ssim"], scores["edge_correlation"])
     if strongest > 0.90 and confidence > 0.45:
         confidence = min(1.0, confidence * 1.15)
 
     # --- presence vetoes ----------------------------------------------------
-    if signals["ncc"] >= VETO.strong_ncc and signals["ssim"] >= VETO.strong_ssim:
+    if signals["ncc"] >= VETO.decisive_ncc:
+        confidence = min(confidence, VETO.decisive_cap)
+    elif (
+        signals["ncc"] >= VETO.strong_ncc
+        and signals["edge_correlation"] >= VETO.strong_edge_correlation
+    ):
         confidence = min(confidence, VETO.strong_cap)
     elif (
         signals["ncc"] >= VETO.good_ncc
-        and signals["edge_iou"] >= VETO.good_edge_iou
-        and signals["hist_distance"] <= VETO.good_hist
+        and signals["edge_correlation"] >= VETO.good_edge_correlation
+        and signals["colour_distance"] <= VETO.good_colour
     ):
         confidence = min(confidence, VETO.good_cap)
 
@@ -307,9 +313,18 @@ def inspect(
     mask = board_mask(reference_bgr)
     aligned, photometric = match_levels(warped, reference_bgr, mask)
 
+    # Equalise focus before measuring anything. ``reference_for_measurement``
+    # may be a blurred copy; the untouched ``reference_bgr`` is still what the
+    # operator sees in the UI.
+    reference_for_measurement, aligned_for_measurement, sharpness = match_sharpness(
+        reference_bgr, aligned
+    )
+
     raw: list[tuple[dict[str, float], dict[str, float], tuple[int, int]]] = []
     for part in part_list:
-        raw.append(_analyse_part(reference_bgr, aligned, part["bbox"]))
+        raw.append(
+            _analyse_part(reference_for_measurement, aligned_for_measurement, part["bbox"])
+        )
 
     raw_confidences = [_fuse(signals, scores) for signals, scores, _ in raw]
 
@@ -373,6 +388,7 @@ def inspect(
         verdicts=verdicts,
         alignment=alignment,
         photometric={k: round(float(v), 4) for k, v in photometric.items()},
+        sharpness={k: round(float(v), 4) for k, v in sharpness.items()},
         scene_compensation=round(compensation, 4),
         sensitivity=preset.key,
         thresholds={

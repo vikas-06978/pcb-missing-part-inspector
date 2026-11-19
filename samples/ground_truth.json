@@ -1,0 +1,334 @@
+{
+  "generator": "tools/generate_samples.py",
+  "seed": 20261119,
+  "board_size": [
+    1120,
+    760
+  ],
+  "reference": "boards/golden.png",
+  "parts": [
+    {
+      "name": "U1",
+      "kind": "ic",
+      "bbox": [
+        210,
+        250,
+        176,
+        176
+      ]
+    },
+    {
+      "name": "U2",
+      "kind": "ic",
+      "bbox": [
+        520,
+        300,
+        104,
+        104
+      ]
+    },
+    {
+      "name": "U3",
+      "kind": "ic",
+      "bbox": [
+        760,
+        232,
+        86,
+        64
+      ]
+    },
+    {
+      "name": "J1",
+      "kind": "connector",
+      "bbox": [
+        180,
+        92,
+        300,
+        74
+      ]
+    },
+    {
+      "name": "J2",
+      "kind": "header",
+      "bbox": [
+        700,
+        96,
+        150,
+        54
+      ]
+    },
+    {
+      "name": "C1",
+      "kind": "electrolytic",
+      "bbox": [
+        540,
+        520,
+        96,
+        96
+      ]
+    },
+    {
+      "name": "C2",
+      "kind": "electrolytic",
+      "bbox": [
+        680,
+        520,
+        96,
+        96
+      ]
+    },
+    {
+      "name": "C3",
+      "kind": "tantalum",
+      "bbox": [
+        430,
+        540,
+        46,
+        28
+      ]
+    },
+    {
+      "name": "C4",
+      "kind": "mlcc",
+      "bbox": [
+        430,
+        596,
+        38,
+        24
+      ]
+    },
+    {
+      "name": "C5",
+      "kind": "mlcc",
+      "bbox": [
+        430,
+        640,
+        38,
+        24
+      ]
+    },
+    {
+      "name": "C6",
+      "kind": "mlcc",
+      "bbox": [
+        214,
+        470,
+        34,
+        22
+      ]
+    },
+    {
+      "name": "C7",
+      "kind": "mlcc",
+      "bbox": [
+        268,
+        470,
+        34,
+        22
+      ]
+    },
+    {
+      "name": "C8",
+      "kind": "mlcc",
+      "bbox": [
+        322,
+        470,
+        34,
+        22
+      ]
+    },
+    {
+      "name": "R1",
+      "kind": "resistor",
+      "bbox": [
+        214,
+        520,
+        40,
+        22
+      ]
+    },
+    {
+      "name": "R2",
+      "kind": "resistor",
+      "bbox": [
+        214,
+        560,
+        40,
+        22
+      ]
+    },
+    {
+      "name": "R3",
+      "kind": "resistor",
+      "bbox": [
+        214,
+        600,
+        40,
+        22
+      ]
+    },
+    {
+      "name": "R4",
+      "kind": "resistor",
+      "bbox": [
+        300,
+        520,
+        40,
+        22
+      ]
+    },
+    {
+      "name": "R5",
+      "kind": "resistor",
+      "bbox": [
+        300,
+        560,
+        40,
+        22
+      ]
+    },
+    {
+      "name": "R6",
+      "kind": "resistor",
+      "bbox": [
+        876,
+        470,
+        22,
+        40
+      ]
+    },
+    {
+      "name": "Y1",
+      "kind": "crystal",
+      "bbox": [
+        430,
+        300,
+        72,
+        40
+      ]
+    },
+    {
+      "name": "L1",
+      "kind": "inductor",
+      "bbox": [
+        660,
+        420,
+        62,
+        52
+      ]
+    },
+    {
+      "name": "D1",
+      "kind": "led",
+      "bbox": [
+        880,
+        320,
+        30,
+        30
+      ]
+    },
+    {
+      "name": "D2",
+      "kind": "led",
+      "bbox": [
+        880,
+        376,
+        30,
+        30
+      ]
+    },
+    {
+      "name": "U4",
+      "kind": "ic",
+      "bbox": [
+        820,
+        560,
+        92,
+        72
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "file": "boards/board_01_ok_clean.jpg",
+      "missing": [],
+      "severity": 0.15,
+      "note": "Good board, near-perfect retake"
+    },
+    {
+      "file": "boards/board_02_missing_U2.jpg",
+      "missing": [
+        "U2"
+      ],
+      "severity": 0.25,
+      "note": "One mid-size IC removed"
+    },
+    {
+      "file": "boards/board_03_ok_dim.jpg",
+      "missing": [],
+      "severity": 0.6,
+      "note": "Good board, dimmer light and slight shift"
+    },
+    {
+      "file": "boards/board_04_missing_C1_R3.jpg",
+      "missing": [
+        "C1",
+        "R3"
+      ],
+      "severity": 0.35,
+      "note": "Electrolytic plus a chip resistor"
+    },
+    {
+      "file": "boards/board_05_missing_small.jpg",
+      "missing": [
+        "C6",
+        "C7"
+      ],
+      "severity": 0.3,
+      "note": "Two of the smallest passives"
+    },
+    {
+      "file": "boards/board_06_missing_three.jpg",
+      "missing": [
+        "U3",
+        "Y1",
+        "D1"
+      ],
+      "severity": 0.45,
+      "note": "IC, crystal and an LED"
+    },
+    {
+      "file": "boards/board_07_ok_harsh.jpg",
+      "missing": [],
+      "severity": 0.95,
+      "note": "Good board, worst-case photo"
+    },
+    {
+      "file": "boards/board_08_missing_J2.jpg",
+      "missing": [
+        "J2"
+      ],
+      "severity": 0.55,
+      "note": "Connector removed, harsh light"
+    },
+    {
+      "file": "boards/board_09_missing_U1.jpg",
+      "missing": [
+        "U1"
+      ],
+      "severity": 0.4,
+      "note": "The largest part on the board"
+    },
+    {
+      "file": "boards/board_10_missing_mixed.jpg",
+      "missing": [
+        "R6",
+        "C3",
+        "L1",
+        "U4"
+      ],
+      "severity": 0.7,
+      "note": "Four parts, harsh photo"
+    }
+  ]
+}
