@@ -293,7 +293,15 @@ DEFAULT_SENSITIVITY = "balanced"
 
 @dataclass(frozen=True)
 class SuggestConfig:
-    max_suggestions: int = 40
+    #: Upper bound on proposed boxes, as a guard against a pathological image
+    #: producing thousands, not as an opinion about how many parts a board
+    #: has. It was 40, which silently truncated a 41-component board and
+    #: dropped the smallest part: the detector had found it, the cap threw it
+    #: away, and the result looked like a detection failure.
+    #:
+    #: Real assemblies run to hundreds of parts, so the guard sits far above
+    #: anything a person would annotate by hand.
+    max_suggestions: int = 400
     min_area_fraction: float = 0.00035   # of board area
     max_area_fraction: float = 0.09
     max_aspect_ratio: float = 9.0

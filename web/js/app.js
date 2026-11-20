@@ -252,7 +252,12 @@ function updateStatus(engine) {
   $('#status-board').textContent = project?.reference
     ? `${project.reference.width}x${project.reference.height}`
     : 'none loaded';
-  $('#status-parts').textContent = String(project?.parts?.length ?? 0);
+  // The canvas is the truth here, not the last saved copy. Parts are drawn
+  // immediately and saved a moment later, so reading the project would show a
+  // stale count for that moment, and auto-detect made it show zero right
+  // after adding forty boxes.
+  $('#status-parts').textContent =
+    String(state.annotator?.count ?? project?.parts?.length ?? 0);
 
   const preset = state.config?.sensitivity_presets
     ?.find((p) => p.key === (project?.sensitivity || state.config?.default_sensitivity));
@@ -405,6 +410,7 @@ async function savePartsNow() {
   try {
     state.project = await api.saveParts(parts);
     state.dirty = false;
+    updateStatus();
     goTo(state.step);
   } catch (error) {
     toast('Could not save the parts', error.message, 'error');
