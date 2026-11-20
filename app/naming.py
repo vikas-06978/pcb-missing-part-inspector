@@ -248,7 +248,7 @@ def parse_designator(reply: str) -> str:
 
 
 def suggest_name(
-    reference_bgr: np.ndarray, bbox: list[int], model: str, timeout: float = 45.0
+    reference_bgr: np.ndarray, bbox: list[int], model: str, timeout: float = 180.0
 ) -> tuple[str, str]:
     """Suggest one designator. Returns ``(name, note)``; name is '' if unsure."""
     crop = crop_for_naming(reference_bgr, bbox)
@@ -268,7 +268,7 @@ def suggest_name(
             timeout=timeout,
         )
     except (urllib.error.URLError, OSError, ValueError, TimeoutError) as exc:
-        return "", f"Ollama did not answer ({exc.__class__.__name__})."
+        return "", f"TIMEOUT/ERROR: Ollama did not answer ({exc.__class__.__name__})."
 
     name = parse_designator(payload.get("response", ""))
     if not name:

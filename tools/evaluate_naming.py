@@ -63,7 +63,7 @@ def main() -> None:
     print(f"Reference : {truth['reference']} ({reference.shape[1]}x{reference.shape[0]})")
     print(f"Parts     : {len(parts)}\n")
 
-    correct = declined = wrong = 0
+    correct = declined = wrong = failed = 0
     rows: list[tuple[str, str, str]] = []
     started = time.perf_counter()
 
@@ -71,7 +71,10 @@ def main() -> None:
         expected = part["name"].upper()
         got, note = suggest_name(reference, part["bbox"], model)
 
-        if not got:
+        if not got and note.startswith("TIMEOUT/ERROR"):
+            outcome = "failed"
+            failed += 1
+        elif not got:
             outcome = "declined"
             declined += 1
         elif got.upper() == expected:
@@ -82,7 +85,7 @@ def main() -> None:
             wrong += 1
 
         rows.append((expected, got or "-", outcome))
-        marker = {"correct": "  ", "declined": " .", "WRONG": "<-"}[outcome]
+        marker = {"correct": "  ", "declined": " .", "WRONG": "<-", "failed": " !"}[outcome]
         if args.show_all or outcome != "correct":
             print(f"  {marker} {index:>3}/{len(parts)}  printed {expected:<5} "
                   f"model said {got or '(declined)':<12} {outcome}")
@@ -96,6 +99,8 @@ def main() -> None:
           f"left for the operator")
     print(f"  WRONG      {wrong:>3}/{total}  ({wrong / total * 100:.0f}%)  "
           f"confidently mislabelled")
+    print(f"  failed     {failed:>3}/{total}  ({failed / total * 100:.0f}%)  "
+          f"timed out or errored")
     print(f"  time       {elapsed:.0f}s total, {elapsed / max(total, 1):.1f}s per part")
 
     if wrong:
