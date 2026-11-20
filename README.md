@@ -136,10 +136,10 @@ reflecting off the solder mask**, **focus missed**, and a hard JPEG on top.
 | | Bench camera | By hand |
 |---|---|---|
 | Missed removals | **0** | **0** |
-| A part stated missing, wrongly | **0** | 15 of 129 |
-| Precision of stated missing | **100%** | **88%** |
-| Sent for review instead | 0 | 74 |
-| Boards exactly right | 80 / 80 | 44 / 60 |
+| A part stated missing, wrongly | **0** | 6 of 103 |
+| Precision of stated missing | **100%** | **94%** |
+| Sent for review instead | 0 | 109 |
+| Boards exactly right | 80 / 80 | 40 / 60 |
 
 **Nothing is ever missed, under any condition tested.** That is the property
 worth protecting: a false alarm costs a second look, a missed removal ships a
@@ -181,8 +181,15 @@ So the fix is not a better filter, it is a better line:
   whole-image exposure match cannot see.
 - **A reflection is kept out of the exposure match.** A highlight drags the
   whole-image statistics, so the correction computed from them is wrong
-  everywhere *else*. The parts a reflection made the engine call missing were
-  never the parts underneath it.
+  everywhere *else*.
+- **A part mostly under a reflection is not asserted to be missing.** It is
+  shown as something to check, with the reason given. Measured on hand-held
+  photographs, of the parts this tool wrongly claimed were missing, the
+  median lay 73% under a highlight while the ones it got right lay at 0%, so
+  the rule separates them rather than blunting everything. It cut wrong
+  assertions from 15 to 6 and did not cost a single detection, at any
+  threshold tried, because it only ever turns an assertion into a question.
+  It never fires on the bench sets, which stay at 80/80 and 12/12.
 
 #### Reproduce it
 
@@ -698,10 +705,13 @@ Stated here rather than discovered by whoever tries it:
   of real conditions, not real conditions. They are good evidence that the
   design is sound and the thresholds are not knife-edge, and they are not a
   prediction of field accuracy.
-- **A flash reflection still costs precision.** On hand-held photographs 58%
-  of everything flagged is spurious. Those arrive as review items rather than
-  as assertions, and no removal has ever been missed, but it is more work for
-  the operator than a bench photo would be.
+- **A flash reflection still costs work.** On hand-held photographs 58% of
+  everything flagged is spurious. Almost all of it now arrives as review
+  items rather than as assertions, 94% of what the tool *states* is missing
+  is right, and no removal has ever been missed, but checking those items is
+  real work that a bench photo would not have cost. The way to avoid it is a
+  diffuse lamp off the board's axis, which is what inspection rigs use and
+  why they use it.
 - **Nine of the forty-one printed designators cannot be read** by the
   optional label reader, and they are the chips. [Why](#why-the-last-nine-cannot-be-read).
 - **It has not been run on a real board**, because there was not one to

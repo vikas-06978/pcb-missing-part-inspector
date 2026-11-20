@@ -40,6 +40,7 @@ from app.config import (
     STATE_NOT_VISIBLE,
     STATE_PRESENT,
     GLARE_BOARD_FRACTION,
+    GLARE_PART_FRACTION,
     GLARE_RATIO,
     ADAPTIVE_THRESHOLD_CAP,
     ADAPTIVE_THRESHOLD_K,
@@ -443,6 +444,12 @@ def inspect(
     # illumination alone, so printed detail and components do not register.
     glare = highlight
     glare_board_fraction = float(np.count_nonzero(glare)) / max(glare.size, 1)
+    glare_fractions: list[float] = []
+    for part in part_list:
+        px, py, pw, ph = _clamp_bbox(part["bbox"], width, height)
+        region = glare[py:py + ph, px:px + pw]
+        glare_fractions.append(float(np.count_nonzero(region)) / max(region.size, 1))
+
     raw: list[tuple[dict[str, float], dict[str, float], tuple[int, int]]] = []
     for part in part_list:
         raw.append(
@@ -520,8 +527,8 @@ def inspect(
         )
 
     verdicts: list[PartVerdict] = []
-    for part, (signals, scores, offset), raw_confidence, coverage in zip(
-        part_list, raw, raw_confidences, coverages
+    for part, (signals, scores, offset), raw_confidence, coverage, glare_fraction in zip(
+        part_list, raw, raw_confidences, coverages, glare_fractions
     ):
         confidence = float(np.clip(raw_confidence - compensation, 0.0, 1.0))
         evidence, reason = _build_evidence(scores)
@@ -534,6 +541,20 @@ def inspect(
                 if coverage < 0.02
                 else f"Only {coverage * 100:.0f}% of this part is in the photograph, "
                      "which is too little to judge."
+            )
+        elif (
+            confidence >= confident_threshold
+            and glare_fraction >= GLARE_PART_FRACTION
+        ):
+            # Scores as missing, but most of it is under a reflection, and a
+            # reflection flattens a fitted part into the same thing an empty
+            # footprint looks like. Saying "missing" here would be reporting
+            # the lighting as a fault in the board.
+            state = STATE_REVIEW
+            reason = (
+                f"A reflection covers {glare_fraction * 100:.0f}% of this part. "
+                "Under a highlight a fitted part and an empty footprint look "
+                "alike, so this needs an eye on it, or a photo without the flash."
             )
         elif confidence >= confident_threshold:
             state = STATE_MISSING

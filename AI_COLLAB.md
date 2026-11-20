@@ -654,6 +654,57 @@ has never yet missed a removal.
 
 ---
 
+## Decision 20: the rule I deleted was right, on a mask that was wrong
+
+Asked to go after the reflection problem. Two leads, and the first one was
+mine and wrong.
+
+**The dead lead.** The false alarms carried a high gradient ratio, which
+reads as the reference holding far more detail than the test, so I suspected
+the sharpness equalisation was saturating under the heavy blur a hand-held
+photo brings. Measured it: before equalisation the test sits at 0.04 of the
+reference's focus, after it sits at 1.015, and no board in the sample ends up
+more than 25% out. It works. My first probe appeared to show a four-fold
+over-blur, which was my own error, measuring the output at full resolution in
+one colour channel while the search works on a grey image downscaled to 700.
+Measuring the same way the code does made the apparent fault disappear.
+
+**The real one is a rule I had written and deleted two sessions earlier.**
+Parts mostly under a highlight were being sent for review instead of called
+missing, and I removed it because it suppressed eleven real removals. That
+was a true measurement of a broken mask: the highlight detector worked on the
+raw image, and lifting a dark chip off a board leaves a brighter patch, which
+is exactly what it was looking for. The mask was fixed afterwards for a
+different reason, to keep highlights out of the exposure match, and it now
+measures illumination on bare board only, with the components cut out and the
+light interpolated across them. It cannot see a missing part any more.
+
+Re-measured on that footing, the picture reverses. Of the parts the tool
+wrongly asserted were missing, the median lay 73% under a highlight; of the
+ones it got right, the median lay at 0%.
+
+| reflection rule | wrong assertions | boards exact | missed |
+|---|---|---|---|
+| off | 15 | 44/60 | 0 |
+| at 80% | 8 | 39/60 | 0 |
+| **at 50%** | **6** | 40/60 | **0** |
+| at 35% | 5 | 39/60 | 0 |
+
+Nothing is missed at any setting, because the rule only turns an assertion
+into a question, and it never fires on the bench sets at all: 12/12 and 80/80
+are unchanged. Stated-missing precision on hand-held photographs went from
+88% to 94%.
+
+**What I take from it.** A negative result is a result about a specific
+setup, not a permanent fact, and I had filed it as the second kind. The rule
+was sound; the evidence it ran on was not. Nothing in my notes said "revisit
+this if the mask changes", so when the mask did change the connection was
+only made because the user asked me to look at reflections again. A measured
+rejection deserves a note saying what would have to be true for it to be
+worth retrying.
+
+---
+
 ## What the AI was better at, and where it needed holding
 
 **Better:** breadth and speed. Six evidence channels, a homography

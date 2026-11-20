@@ -342,15 +342,23 @@ SUGGEST = SuggestConfig()
 #: to the illumination alone.
 GLARE_RATIO = 1.30
 
-# A per-part version of this was tried: if a highlight covered most of a
-# part, its missing verdict was downgraded to review, on the reasoning that a
-# reflection hides a fitted part and an empty footprint equally well. It was
-# removed after measurement. Ablating the nuisances one at a time showed that
-# reflections were never what drove the false alarms, and the rule suppressed
-# eleven real removals, because lifting a dark chip off the board leaves
-# something brighter behind and that is what a highlight looks like. The
-# highlight mask is now measured on bare board only and used for the exposure
-# match and the warning, never to silence a part.
+#: How much of a part must lie under a highlight before the tool declines to
+#: assert that it is missing, and asks for a look instead.
+#:
+#: This rule was written once, measured, and deleted, because the highlight
+#: mask of the time was fooled by the very thing it was meant to protect:
+#: lifting a dark chip off a board leaves something brighter behind, so
+#: eleven real removals were suppressed as reflections. The mask is now
+#: measured on bare board only, with the components cut out and the
+#: illumination interpolated across them, and it cannot see a missing part
+#: any more. Re-measured on that footing, the picture reversed: of the parts
+#: this tool wrongly asserted were missing on hand-held photographs, the
+#: median lay 73% under a highlight, while the parts it got right lay at 0%.
+#:
+#: The downgrade only ever turns an assertion into a question. Nothing is
+#: hidden, and a part under a reflection that really is missing is still
+#: shown, as something to check.
+GLARE_PART_FRACTION = 0.50
 
 #: Fraction of the whole board under a highlight before the operator is told
 #: to retake the photograph.
