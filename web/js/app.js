@@ -503,6 +503,17 @@ async function readNames() {
   }
 }
 
+/** Intersection over union of two [x, y, w, h] boxes. */
+function overlaps(a, b) {
+  const x0 = Math.max(a[0], b[0]);
+  const y0 = Math.max(a[1], b[1]);
+  const x1 = Math.min(a[0] + a[2], b[0] + b[2]);
+  const y1 = Math.min(a[1] + a[3], b[1] + b[3]);
+  if (x1 <= x0 || y1 <= y0) return 0;
+  const intersection = (x1 - x0) * (y1 - y0);
+  return intersection / (a[2] * a[3] + b[2] * b[3] - intersection);
+}
+
 async function suggestParts() {
   const button = $('#suggest-parts');
   button.disabled = true;
@@ -514,10 +525,35 @@ async function suggestParts() {
       toast('Nothing detected', 'Draw the boxes by hand, it only takes a moment.', 'warn');
       return;
     }
-    state.annotator.addParts(suggestions.map((s) => s.bbox));
+
+    // Auto-detect looks at the board, not at what is already on it, so it
+    // returns the same components every time it runs. Adding them blindly
+    // meant a second press silently doubled the part list, and a few presses
+    // buried the board under hundreds of stacked boxes.
+    //
+    // Anything that already has a box is skipped. The detector stays
+    // stateless and this screen decides what is actually new, which also
+    // makes it safe to run again after drawing a few boxes by hand.
+    const existing = state.annotator.getParts();
+    const fresh = suggestions
+      .map((s) => s.bbox)
+      .filter((bbox) => !existing.some((part) => overlaps(bbox, part.bbox) > 0.3));
+    const already = suggestions.length - fresh.length;
+
+    if (!fresh.length) {
+      toast(
+        'Everything detected already has a box',
+        `All ${suggestions.length} components found are already in your list.`,
+      );
+      return;
+    }
+
+    state.annotator.addParts(fresh);
     toast(
-      `${suggestions.length} candidate parts added`,
-      'Rename the ones you care about and delete the rest.',
+      `${fresh.length} part${fresh.length === 1 ? '' : 's'} added`,
+      already
+        ? `${already} already had a box and were left alone. Name the new ones and delete any you do not need.`
+        : 'Name the ones you care about and delete the rest.',
       'success',
     );
   } catch (error) {
@@ -853,7 +889,16 @@ async function main() {
 
   $('#suggest-parts').addEventListener('click', suggestParts);
   $('#read-names').addEventListener('click', readNames);
-  $('#rename-all').addEventListener('click', () => state.annotator?.autoName());
+  $('#rename-all').addEventListener('click', () => {
+    const annotator = state.annotator;
+    if (!annotator?.count) return;
+    annotator.autoName();
+    toast(
+      `Renumbered ${annotator.count} parts`,
+      'These are placeholders in reading order, not the designators printed on '
+      + 'the board. Double-click a part to see it closely and give it a real name.',
+    );
+  });
 
   $('#inspect-part').addEventListener('click', () => {
     const annotator = state.annotator;

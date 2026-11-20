@@ -7,7 +7,7 @@ It starts at the very first prompt.
 
 ## How this was built, honestly
 
-This document covers sixteen decisions. I set the objective, the constraints
+This document covers seventeen decisions. I set the objective, the constraints
 and the quality bar, and handed the
 implementation to Claude (Claude Code, Opus) with an explicit mandate to make
 the technical and design choices itself: my words were *"you to choose
@@ -419,6 +419,38 @@ in `formatBytes`, which the script turned into a literal `": "` on screen.
 
 **Also left alone deliberately:** `ai-chat-history/`. It is a record of what
 was said; editing it to look tidier would make it a worse record.
+
+---
+
+## Decision 17: a button that promised what it never did
+
+**Reported:** "auto detect hone per parts add ho rahe jabki already hai" and
+"auto name to name detect hi nhi kr raha". Two bugs, and the second is the
+more interesting one.
+
+**Auto-detect was stateless and the screen did not compensate.** It looks at
+the board, not at what is already on it, so it returns the same forty
+components every single run. The screen added them blindly, so a second press
+silently doubled the list and a few presses buried the board under hundreds of
+stacked boxes, numbered into the 280s. Fixed by skipping any suggestion that
+overlaps an existing box, which also makes it safe to run again after drawing
+a few by hand: delete two boxes, press it, and exactly those two come back.
+
+**"Auto-name" never named anything.** It renumbered boxes in reading order:
+Part 1, Part 2, Part 3. That is a useful thing to have, but the label claimed
+something else entirely, and a user who presses a button called Auto-name is
+entitled to expect it read the designators printed on the board.
+
+Nobody wrote a wrong line of code there. The function does exactly what its
+name inside the codebase says, `autoName`, and I carried that name onto a
+button without asking what a person would read it as. It is the cheapest kind
+of defect to ship and one of the more expensive to be caught on in a demo,
+because it does not look like a bug, it looks like a lie.
+
+**Decided:** the button now says **Renumber**, its tooltip says it does not
+read the printed designators, and pressing it says so again in plain words.
+The only thing in this project that reads real printed names is the optional
+Ollama reader, and that one publishes its error rate.
 
 ---
 
