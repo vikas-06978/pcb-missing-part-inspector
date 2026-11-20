@@ -289,6 +289,32 @@ answers by refusing every claimant when two parts want the same designator.
 It cannot catch a wrong answer that happens to be unique, so one in ten still
 slips through.
 
+##### What about OCR instead of a vision model?
+
+The right instinct, and I should have tried it before reaching for an LLM:
+reading printed characters is what OCR is for. Measured on the same board with
+a pip-installable ONNX OCR engine:
+
+| Approach | Correct | Wrong | Time for 41 parts |
+|---|---|---|---|
+| Vision model (`qwen2.5vl:3b`) | 30 / 41 | 8 | 33 min |
+| OCR, one crop per part | 22 / 41 | 14 | 40 s |
+| OCR, one pass over the board | 15 / 41 | 22 | 4 s |
+| **Typing them** | **41 / 41** | **0** | **~2 min** |
+
+OCR is fifty times faster and meaningfully less accurate, so it was not
+adopted and its dependency was removed. The limit in both cases is the same
+and it is not the reader: the designator is about 8 px tall and sits among
+several neighbours, so deciding *which* text belongs to *which* part is the
+hard part. Forcing a one-to-one assignment, which should help since no two
+parts share a designator, made it worse: 14 correct became 7, because the
+engine only finds about 24 of the 41 labels in the first place.
+
+One caveat in OCR's favour. This board's silkscreen is drawn with a
+single-stroke vector font at 8 px, which is harder than the solid typeface a
+real board is screened with, so these numbers probably understate what OCR
+would do on real hardware. Worth retrying there.
+
 **The honest conclusion: typing is better.** You would wait 33 minutes, then
 have to verify all 41 names anyway, and checking 41 names against a board is
 about as much work as typing them. `Enter` moves to the next field, so naming
