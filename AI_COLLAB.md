@@ -450,7 +450,77 @@ because it does not look like a bug, it looks like a lie.
 **Decided:** the button now says **Renumber**, its tooltip says it does not
 read the printed designators, and pressing it says so again in plain words.
 The only thing in this project that reads real printed names is the optional
-Ollama reader, and that one publishes its error rate.
+label reader, and that one publishes its error rate (Decision 18).
+
+---
+
+## Decision 18: the reader was never the problem
+
+**Reported:** "33 minutes too much i thought bs ek click mai kaam ho jayega",
+then "aur raste try kro", with the constraint restated: it has to run offline,
+with no internet and no API keys.
+
+Fair. Thirty-three minutes for thirty right answers and eight wrong ones is
+not a feature, it is a thing you switch on once and never again.
+
+**What I had already concluded, and what I had missed.** I had measured OCR
+against the vision model, found it worse, removed it, and written up "typing
+is better" as the honest conclusion. That write-up contained the answer and I
+walked past it: *seven of the model's eight wrong answers were a neighbouring
+component's designator*. Every approach I had tried, the model included, read
+the text more or less correctly and then attached it to the wrong part. I had
+been treating a data-association problem as a character-recognition problem,
+so every fix I reached for, bigger crops, more upscaling, a stronger model,
+was aimed at the half that already worked.
+
+**Three ideas tested and rejected, before the one that worked.** Isolating
+the silkscreen by colour so the reader sees clean text (17/41: the glyphs are
+anti-aliased into the board, so the threshold eats them). Accepting a reading
+only when its letter prefix matches the component's visual type (no new
+correct answers; it converts wrong answers into blanks, which is worth having
+but is not an improvement in reading). Stripping long bright structures so an
+IC's pins stop merging with the designator printed across them (deletes the
+text with the pins, because at 8 px they are one connected blob). Each one is
+in the README, because the negative results are what justify the shape of
+what replaced them.
+
+**What worked was geometry, not recognition.** A CAD tool prints every
+designator at the same offset from its component. That offset is recoverable
+from the board itself: survey the board once, pair every text found with every
+part near it, and let the pairings vote. The wrong pairs disagree with each
+other; the right ones agree. Twenty-three of them agreed on a single offset,
+and from there each label's position is known, so the reader gets the narrow
+strip the text actually occupies instead of a crop containing a whole
+component.
+
+| | Correct | Wrong | Time |
+|---|---|---|---|
+| Vision model | 30 / 41 | 8 | 33 min |
+| OCR, per-part crops | 22 / 41 | 14 | 40 s |
+| OCR + learned convention | **32 / 41** | **0** | **36 s** |
+
+Fifty-five times faster than the model, two more right, and the eight wrong
+answers became zero, verified on a second independently rendered board and
+then end to end through the running app.
+
+**The number I care about is the zero.** A blank costs the operator a few
+seconds of typing. A confidently wrong designator looks completely plausible,
+mislabels the report, and is caught only by checking every name against the
+board, which is the entire job you were trying to avoid. An assistant that
+declines is useful; one that is quietly wrong one time in five is worse than
+no assistant at all.
+
+**Where I made myself less comfortable on purpose.** The obvious move was to
+turn this on by default, since it needs no install, no server and no key.
+I did not, because this project had already read the brief's "AI tools ...
+never inside the solution" conservatively and fenced the vision model behind a
+flag. An ONNX text recogniser is arguably not "an AI tool like Gemini" in the
+way a barcode scanner is not. It is still a convolutional network in a file,
+and reading the same sentence strictly for a model I was unimpressed by and
+loosely for one I had just got working would be convenience dressed up as a
+principle. Same switch, now with a readable name: `python run.py
+--read-labels`. The cost is one flag; what it buys is that "out of the box
+this app runs no model of any kind" is still a true sentence.
 
 ---
 

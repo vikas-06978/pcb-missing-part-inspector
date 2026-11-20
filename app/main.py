@@ -23,7 +23,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
-from app import naming, storage
+from app import naming, silkscreen, storage
 from app.config import (
     ALLOWED_UPLOAD_TYPES,
     APP_NAME,
@@ -265,14 +265,49 @@ def suggest() -> dict[str, Any]:
     }
 
 
+#: The label convention most recently worked out, kept against the exact set
+#: of boxes it was derived from. Reading a board is dozens of separate
+#: requests so the survey pass must not repeat, but the convention stops being
+#: valid the moment the operator moves or adds a part, and comparing the boxes
+#: is cheap next to re-running it.
+_convention_cache: tuple[tuple[tuple[int, ...], ...], Any] | None = None
+
+
+def _label_convention(reference: np.ndarray, project: storage.Project):
+    global _convention_cache
+    key = tuple(tuple(p.bbox) for p in project.parts)
+    if _convention_cache is not None and _convention_cache[0] == key:
+        return _convention_cache[1]
+    convention = silkscreen.learn_convention(reference, [p.bbox for p in project.parts])
+    _convention_cache = (key, convention)
+    return convention
+
+
 @app.get("/api/naming/status")
 def naming_status() -> dict[str, Any]:
-    """Is the optional local naming assistant usable right now?
+    """Can the printed designators be read right now, and by what?
 
     Called once when the Parts screen opens. If this says no, the button is
     simply not shown and naming happens by hand, which is the normal route.
+
+    The offline reader is preferred over the optional vision model because it
+    was measured to be better on both counts that matter: it reads more labels
+    and, unlike the model, it has never yet returned a wrong one. The model
+    stays as a fallback for boards whose labels the reader cannot find.
     """
-    return naming.status().to_dict()
+    reader = silkscreen.status()
+    if reader.available:
+        return {
+            "available": True,
+            "route": "silkscreen",
+            "model": reader.engine,
+            "reason": "",
+        }
+    state = naming.status()
+    payload = state.to_dict()
+    payload["route"] = "vision-model" if state.available else ""
+    payload["reason"] = payload.get("reason") or reader.reason
+    return payload
 
 
 class NameRequest(BaseModel):
@@ -294,6 +329,17 @@ def suggest_part_name(payload: NameRequest) -> dict[str, Any]:
     part = next((p for p in project.parts if p.id == payload.part_id), None)
     if part is None:
         raise HTTPException(status_code=404, detail="Part not found.")
+
+    if silkscreen.status().available:
+        convention = _label_convention(reference, project)
+        if convention is None:
+            raise _bad_request(
+                "Could not find the printed designators on this board. "
+                "Type the part names in instead."
+            )
+        name = silkscreen.read_label(reference, part.bbox, convention)
+        note = "" if name else "No designator printed where this board puts them."
+        return {"part_id": part.id, "name": name, "note": note}
 
     state = naming.status()
     if not state.available:

@@ -11,8 +11,9 @@ import { api, ApiError } from './api.js';
 import {
   toast, confirmAction, loadImage, imageFilesFrom, downloadBlob, formatBytes,
 } from './ui.js';
-import { Annotator } from './annotator.js';
+import { Annotator, isPlaceholder } from './annotator.js';
 import { PartView } from './partview.js';
+import { Review } from './review.js';
 import {
   DetailView, renderBatchSummary, renderCards, buildReport,
 } from './results.js';
@@ -195,21 +196,53 @@ function createAnnotator() {
 }
 
 /**
- * Show the label-reading button only if a local Ollama can actually serve it.
+ * Show the label-reading button only if something can actually serve it.
  *
- * Checked when the Parts screen opens rather than at startup, so starting
- * Ollama later and coming back is enough; and failing silently, because a
+ * Two routes can: an offline text reader that ships with the app, and the
+ * optional local vision model. The server picks between them and names the
+ * one it chose, which is worth keeping hold of because they are not equally
+ * trustworthy and the wording at the end of a run says so.
+ *
+ * Checked when the Parts screen opens rather than at startup, so installing
+ * either one later and coming back is enough; and failing silently, because a
  * missing optional tool is not an error the operator needs to hear about.
  */
 async function refreshNamingButton() {
   const button = $('#read-names');
   try {
     const status = await api.namingStatus();
+    state.namingRoute = status.route || '';
     button.classList.toggle('is-hidden', !status.available);
     if (status.available) button.title = `Read printed designators using ${status.model}`;
   } catch {
+    state.namingRoute = '';
     button.classList.add('is-hidden');
   }
+}
+
+/**
+ * Open the name review, creating it the first time it is asked for.
+ *
+ * Built lazily for the same reason the part viewer is: a board that is only
+ * being inspected, with its parts already named, never needs it.
+ */
+function openReview() {
+  const annotator = state.annotator;
+  if (!annotator?.image || !annotator.count) return;
+  if (!state.review) {
+    state.review = new Review({
+      root: $('#review'),
+      onRequestParts: () => state.annotator.getParts(),
+      onRename: (id, name) => state.annotator.renamePart(id, name),
+      onOpenPart: (id) => {
+        state.review.close();
+        state.annotator.focusPart(id);
+        openPartView(id, null);
+      },
+    });
+  }
+  state.review.setImage(annotator.image);
+  state.review.open();
 }
 
 /**
@@ -300,6 +333,18 @@ function renderPartListInner(annotator) {
 
   const parts = annotator.getParts();
   const list = $('#part-list');
+
+  // Naming is the long part of the job and it has no natural end in sight:
+  // forty rows all look alike, and "Part 31" reads like a name until you
+  // notice it is not. So the count of what is left is shown while you work,
+  // and every row still carrying a generated name is marked as one.
+  const unnamed = parts.filter((p) => isPlaceholder(p.name)).length;
+  const remaining = $('#parts-remaining');
+  remaining.textContent = unnamed ? `${unnamed} to name` : 'All named';
+  remaining.classList.toggle('is-done', unnamed === 0 && parts.length > 0);
+  remaining.classList.toggle('is-hidden', parts.length === 0);
+  $('#review-names').disabled = parts.length === 0;
+
   $('#parts-count').textContent = String(parts.length);
   $('#parts-empty').classList.toggle('is-hidden', parts.length > 0);
   $('#reference-parts').textContent = String(parts.length);
@@ -316,6 +361,7 @@ function renderPartListInner(annotator) {
     row.className = 'part-row';
     row.dataset.id = part.id;
     if (annotator.isSelected(part.id)) row.classList.add('is-selected');
+    if (isPlaceholder(part.name)) row.classList.add('is-unnamed');
 
     row.innerHTML = `
       <span class="part-row__index">${index + 1}</span>
@@ -362,7 +408,14 @@ function renderPartListInner(annotator) {
         annotator.select(part.id, { additive: true });
         return;
       }
+      // Open the part rather than just selecting it. Clicking a row used to
+      // pan the canvas to the box, which still leaves you squinting at a
+      // 20 px component trying to read the designator beside it. The whole
+      // reason the viewer exists is that this is the moment you need it, so
+      // asking for a second click on a separate button was making people
+      // work for the thing the feature was for.
       annotator.focusPart(part.id);
+      openPartView(part.id, row.getBoundingClientRect());
     });
 
     row.querySelector('.part-row__del').addEventListener('click', (event) => {
@@ -418,12 +471,12 @@ async function savePartsNow() {
 }
 
 /**
- * Optional: read the printed designators with a local Ollama vision model.
+ * Read the designators printed on the board, so they are not all typed.
  *
  * Strictly a typing shortcut. It fills in names and nothing else; the
- * missing/present decision never touches it. Anything the model is unsure
+ * missing/present decision never touches it. Anything the reader is unsure
  * about is left alone for the operator, which is also what happens to every
- * part if Ollama is not installed.
+ * part if neither reader is installed.
  */
 async function readNames() {
   const button = $('#read-names');
@@ -443,12 +496,13 @@ async function readNames() {
   // while the model works. At roughly a minute a part, a run that showed
   // nothing until the end would look like it had hung.
   //
-  // Conflicts are settled afterwards. Measured on the sample board, the
-  // model's mistakes are almost entirely neighbour confusion: seven of its
-  // eight wrong answers were the designator of a different real component.
-  // Two parts cannot share a designator, so when several claim the same one,
-  // at least one is wrong and nothing says which. Every claimant is then put
-  // back to its placeholder rather than guessed between.
+  // Conflicts are settled afterwards. Whichever route read the board, its
+  // mistakes are almost entirely neighbour confusion: labels sit between
+  // components, and the wrong one gets picked up. Two parts cannot share a
+  // designator, so when several claim the same one, at least one is wrong and
+  // nothing says which. Every claimant is then put back to its placeholder
+  // rather than guessed between. The offline reader has not produced a
+  // conflict on either test board; the vision model produced several.
   //
   // Settling as they arrive does not work: the mistaken answer usually lands
   // before the real part's turn, so it rejects the correct name and keeps the
@@ -497,14 +551,17 @@ async function readNames() {
       toast(
         `Read ${read} of ${parts.length} labels`,
         `${left ? `${left} left as placeholders${contested ? ` (${contested} contested)` : ''}. ` : ''}`
-        + 'Check every name against the board: roughly one in ten can still be '
-        + 'the neighbouring part’s label.',
+        + (state.namingRoute === 'silkscreen'
+          ? 'Nothing it was unsure of was guessed, but check the names against '
+            + 'the board before you rely on the report.'
+          : 'Check every name against the board: roughly one in ten can still '
+            + 'be the neighbouring part’s label.'),
         'warn',
       );
     } else {
       toast(
         'No labels could be read',
-        'The model could not make out the printed designators. Name them by hand.',
+        'The printed designators could not be made out. Name the parts by hand.',
         'warn',
       );
     }
@@ -890,6 +947,27 @@ async function main() {
   $('#back-to-parts').addEventListener('click', () => goTo('parts'));
   $('#to-inspect').addEventListener('click', async () => {
     await savePartsNow();
+
+    // Last chance to look at the names, offered only when some are still
+    // generated. A placeholder cannot make the engine wrong, but it does make
+    // the report say "Part 7 is missing" to someone who has to then work out
+    // which component that was, so it is worth one question. Asking on every
+    // run, including the ones where everything is named, would just be a
+    // dialog people learn to dismiss without reading.
+    const unnamed = (state.annotator?.getParts() || [])
+      .filter((p) => isPlaceholder(p.name)).length;
+    if (unnamed) {
+      const review = await confirmAction({
+        title: `${unnamed} ${unnamed === 1 ? 'part still has' : 'parts still have'}`
+          + ' a placeholder name',
+        body: 'Names never affect whether a part is found missing, but the '
+          + 'report will say "Part 7" instead of "U3". You can look at each '
+          + 'part as a picture and fill the rest in now.',
+        confirmLabel: 'Check the names',
+        cancelLabel: 'Inspect anyway',
+      });
+      if (review) { openReview(); return; }
+    }
     goTo('inspect');
   });
 
@@ -901,6 +979,7 @@ async function main() {
 
   $('#suggest-parts').addEventListener('click', suggestParts);
   $('#read-names').addEventListener('click', readNames);
+  $('#review-names').addEventListener('click', openReview);
   $('#rename-all').addEventListener('click', () => {
     const annotator = state.annotator;
     if (!annotator?.count) return;

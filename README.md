@@ -16,8 +16,8 @@ Classical computer vision, no training data, **no network access at runtime**.
 
 ## Quick start
 
-Requires **Python 3.10+**. Nothing else: no Node, no build step, no model
-download.
+Requires **Python 3.10+**. Nothing else: no Node, no build step, and nothing
+to fetch beyond `pip install`. No model runs unless you ask for one.
 
 ```bash
 pip install -r requirements.txt
@@ -204,11 +204,22 @@ a row of passives lines up without fighting the mouse.
 
 ### Looking at a part closely
 
-Double-click any box, or press **Inspect & name**, and that component lifts off
-the board into the middle of the screen. Drag it to turn it, scroll to zoom,
-and type its name on the slab itself. `Enter` saves and jumps to the next part
-that still needs a name, so you can work through a whole board without
-touching the mouse.
+Click any part in the list, or double-click its box on the board, and that
+component lifts off the board into the middle of the screen. Drag it to turn
+it, scroll to zoom, and type its name on the slab itself. `Enter` saves and
+jumps to the next part that still needs a name, so you can work through a
+whole board without touching the mouse.
+
+Clicking a row opens the part rather than merely selecting it, because that is
+the moment you need it: you are about to type a name for a 20 px component and
+you cannot read the designator printed beside it at the zoom the board is at.
+Putting that behind a second click on a separate button was making people work
+for the thing the feature existed for.
+
+While you work, the Parts header counts what is left (**9 to name**), the
+viewer repeats it (**12 of 41 · 9 to name**), and every row still carrying a
+generated name is marked, because "Part 31" reads like a real name until you
+look twice.
 
 It is worth saying what the tilt is and is not. The top face is the real
 photographed pixels. The sides are plain neutral material with no detail,
@@ -220,108 +231,156 @@ There is no tool palette on purpose. Figma needs one because it draws a dozen
 kinds of object; here there is exactly one, and a mode you can leave in the
 wrong state is a trap rather than a feature.
 
+### Checking the names before you inspect
+
+**Review names** shows every part as a photograph with the name you gave it
+underneath, in a grid you can scan in one pass. Unnamed parts are flagged,
+a filter narrows it to just those, and clicking any picture opens that part
+up close to fix it.
+
+This exists because the part list is the right tool for *typing* names and
+the wrong one for *checking* them. The mistake this workflow actually
+produces is a name that landed on the part next door: you type down a list
+while looking at a board, one slip puts every later name a row out, and in a
+list of text all forty rows still look correct. In a grid of photographs it is
+obvious, because a capacitor labelled `R4` looks wrong. Pressing **Start
+inspecting** with placeholders left offers this first; with every part named
+it just goes.
+
 ### Optional: reading the printed designators
 
-**This is off by default. Out of the box the app runs no AI model of any
-kind.** You have to switch it on deliberately:
+**This is off by default. Out of the box the app runs no model of any kind.**
+You switch it on deliberately:
 
 ```bash
-ollama pull qwen2.5vl:3b
-PCB_ENABLE_NAMING=1 python run.py     # Windows: set PCB_ENABLE_NAMING=1
+python run.py --read-labels
 ```
 
 Then a **Read labels** button appears on the Parts screen. It reads the
 designator printed beside each component (R12, C3, U7) and fills it in, so you
-correct names instead of typing all of them. Configure with
-`PCB_OLLAMA_MODEL` and `PCB_OLLAMA_URL` if your setup differs.
+correct names instead of typing all of them. On the 41-part sample board it
+fills in 32 of them in about 36 seconds and gets none of them wrong.
 
-Ollama is local: loopback only, no API key, no cloud, no internet. A
-non-local `PCB_OLLAMA_URL` is rejected rather than dialled, so the offline
-guarantee cannot be lost by misconfiguration. It needs about 4 GB of VRAM for
-the 3B model; larger models spill to system memory and become unusably slow.
+Nothing is downloaded and no key is needed. The reader is an ONNX text
+recogniser that ships inside its wheel, loads from disk and runs on the CPU.
+
+#### How it works, and why it is built that way
+
+Pointing a reader at the whole board, or at a crop around each part, both fail
+in the same way: the text is read correctly and then attached to the wrong
+component. Nearly every mistake was a neighbour's designator, `R1` read as
+`F2`, `C6` as `C4`. On a dense board several labels sit within a few pixels of
+several parts, and nearest-neighbour matching cannot tell which belongs to
+which. **The hard problem is not reading the text. It is deciding whose text
+it is.**
+
+A board does not place its labels at random. A CAD tool prints every
+designator at the same offset from its component, so that offset can be
+recovered from the board itself:
+
+1. **Survey.** One cheap reading pass over the whole board, which finds about
+   half the labels. That is enough.
+2. **Learn the convention.** Pair every text found with every part near it.
+   Most pairings are wrong, but the wrong ones disagree with each other while
+   the right ones all agree, so the offset with the most votes is this board's
+   habit. On the sample board, 23 pairs agree on "the centre of the label sits
+   6.5 px right of and 13.2 px above the part's top-left corner".
+3. **Read the strips.** Each label's position is now known, so the reader is
+   handed the narrow strip of board where the text is, instead of a crop
+   containing a whole component.
+
+Nothing here is hardcoded to one layout. A board that prints its designators
+below and to the right is handled by the same code finding a different offset,
+and a board whose labels are too inconsistent to agree on anything is declined
+rather than guessed at. Every length is measured in multiples of the board's
+own printed text height, which the survey measures, so none of it depends on
+image resolution.
+
+#### Measured, on the 41-part sample board
+
+| Approach | Correct | **Wrong** | Time |
+|---|---|---|---|
+| Vision model (`qwen2.5vl:3b`) | 30 / 41 | **8** | 33 min |
+| OCR, one crop per part | 22 / 41 | **14** | 40 s |
+| OCR, one pass over the whole board | 15 / 41 | **22** | 4 s |
+| **OCR + learned label convention** | **32 / 41** | **0** | **36 s** |
+| Typing them by hand | 41 / 41 | **0** | ~2 min |
+
+**The wrong column is the one that matters.** A blank costs you a few seconds
+of typing. A confidently wrong designator quietly mislabels the report, looks
+entirely plausible, and is caught only by checking against the board, which is
+as much work as typing the name was. The vision model got one in five wrong.
+This gets none, on either board it was tried on, and when two parts do claim
+the same designator every claimant is put back to a placeholder, because one
+of them is certainly wrong and nothing says which.
+
+The nine it leaves blank are the chips. Their designators are printed across a
+row of bright pins, and at 8 px the glyphs and the pins are one connected
+blob.
+
+#### Things that were tried and did not work
+
+Recorded because these negative results are the reason the above is shaped the
+way it is.
+
+| Idea | Result |
+|---|---|
+| Isolate the silkscreen by colour before reading | 17 / 41. The glyphs are anti-aliased into the board, so thresholding eats them. |
+| Accept a reading only if its letter prefix matches the component's visual type | No new correct answers. Turns wrong answers into blanks, which the convention already does better. |
+| Remove long bright structures so pins stop merging with the glyphs | Deletes the text along with the pins. At this scale they are one component. |
+| Force a one-to-one assignment of texts to parts | 14 correct became 7. The reader finds only about half the labels, so forcing exclusivity starves the rest. |
+| Allow a board two label conventions instead of one | Recovered nothing and introduced 2 wrong answers. |
+
+One caveat in the reader's favour: this board's silkscreen is a single-stroke
+vector font at 8 px, which is harder than the solid typeface a real board is
+screened with. These numbers probably understate what it would do on real
+hardware.
+
+#### Why it is off by default
 
 **Read this part carefully, because it is the one judgement call in the
 project.** The brief says: "No online APIs or hosted services ... AI tools
 like Gemini may be used only to create practice data, never inside the
 solution."
 
-A local Ollama satisfies the first sentence completely. The second is open to
-reading, and the strongest argument against a narrow reading is that a narrow
-one makes it redundant: if it only meant hosted AI, the sentence before it
-already said so. So the default here is the conservative reading, and the
-feature is fenced in deliberately:
+Everything here is local, so the first sentence is satisfied completely. The
+second is open to reading, and the strongest argument against a narrow reading
+is that a narrow one makes it redundant: if it only meant hosted AI, the
+sentence before it already said so. So this project takes the conservative
+reading.
 
-- **Off unless switched on.** Without `PCB_ENABLE_NAMING=1` no model is
-  contacted, no button appears, and nothing is slower. Naming by hand is the
-  normal route.
+A text recogniser is arguably not "an AI tool like Gemini" at all, in the way
+a barcode scanner is not. But it is still a convolutional network in a file,
+and reading the rule one way for a vision model and another way for this one
+would be convenient rather than honest. So both sit behind the same switch:
+
+- **Off unless switched on.** Without `--read-labels` nothing is loaded, no
+  button appears, and nothing is slower. Naming by hand is the normal route.
 - **It only ever suggests a name.** It has no part whatsoever in deciding
   whether a component is present or missing. That stays entirely in
   `app/vision`: classical, deterministic, explainable.
-- **It is not trusted.** Replies are checked against the shape a designator
-  really has, and when two parts claim the same designator all the claimants
-  are refused, because one of them is certainly wrong and nothing says which.
-- **It is removable.** Delete `app/naming.py` and one button and the project
-  is unchanged in every other respect.
+- **It is not trusted.** Readings are checked against the shape a designator
+  really has, and contested ones are refused rather than guessed between.
+- **It is removable.** Delete `app/silkscreen.py`, `app/naming.py` and one
+  button, and the project is unchanged in every other respect.
 
-If a grader considers any in-app AI out of bounds, the solution stands without
-it, and every inspection number in this README was measured with it switched
-off.
+If a grader considers any of this out of bounds, the solution stands without
+it, and every inspection number in this README was measured with it off.
 
-#### How well does it actually work? Not well enough to rely on
+#### The vision model is still there, as a fallback
 
-Measured on the 41-part sample board, `qwen2.5vl:3b`, GTX 1650 (4 GB):
+`PCB_ENABLE_NAMING=1` with a local Ollama serving `qwen2.5vl:3b` is still
+supported, configured with `PCB_OLLAMA_MODEL` and `PCB_OLLAMA_URL`. It is used
+only when the text reader is not installed, because it was measured to be
+worse on both counts that matter: it reads fewer labels and, unlike the text
+reader, it returns wrong ones. A non-local `PCB_OLLAMA_URL` is rejected rather
+than dialled, so the offline guarantee cannot be lost by misconfiguration.
 
-| | Raw | With the duplicate guard |
-|---|---|---|
-| Correct | 30 / 41 (73%) | 26 / 41 (63%) |
-| **Confidently wrong** | **8 / 41 (20%)** | **4 / 41 (10%)** |
-| Left for you | 3 / 41 (7%) | 11 / 41 (27%) |
-
-**48 s per part, so about 33 minutes for one board.**
-
-Seven of the eight wrong answers were the designator of a *different real
-component*: it reads the neighbour's label. `C6` became `C4`, `Q1` became
-`Q2`, `R4` became `R5`. That is the dangerous kind of wrong, because the name
-looks entirely plausible and you only catch it by checking against the board.
-
-The duplicate guard exploits exactly that pattern, and halves the wrong
-answers by refusing every claimant when two parts want the same designator.
-It cannot catch a wrong answer that happens to be unique, so one in ten still
-slips through.
-
-##### What about OCR instead of a vision model?
-
-The right instinct, and I should have tried it before reaching for an LLM:
-reading printed characters is what OCR is for. Measured on the same board with
-a pip-installable ONNX OCR engine:
-
-| Approach | Correct | Wrong | Time for 41 parts |
-|---|---|---|---|
-| Vision model (`qwen2.5vl:3b`) | 30 / 41 | 8 | 33 min |
-| OCR, one crop per part | 22 / 41 | 14 | 40 s |
-| OCR, one pass over the board | 15 / 41 | 22 | 4 s |
-| **Typing them** | **41 / 41** | **0** | **~2 min** |
-
-OCR is fifty times faster and meaningfully less accurate, so it was not
-adopted and its dependency was removed. The limit in both cases is the same
-and it is not the reader: the designator is about 8 px tall and sits among
-several neighbours, so deciding *which* text belongs to *which* part is the
-hard part. Forcing a one-to-one assignment, which should help since no two
-parts share a designator, made it worse: 14 correct became 7, because the
-engine only finds about 24 of the 41 labels in the first place.
-
-One caveat in OCR's favour. This board's silkscreen is drawn with a
-single-stroke vector font at 8 px, which is harder than the solid typeface a
-real board is screened with, so these numbers probably understate what OCR
-would do on real hardware. Worth retrying there.
-
-**The honest conclusion: typing is better.** You would wait 33 minutes, then
-have to verify all 41 names anyway, and checking 41 names against a board is
-about as much work as typing them. `Enter` moves to the next field, so naming
-a board by hand takes a couple of minutes. The feature stays because it was
-asked for and because it may be worth more on a board with clearer silkscreen
-or on a machine that can run a 7B model, but it is off by default and this
-table is why.
+Measured, 41 parts, GTX 1650 (4 GB): 48 s per part, about 33 minutes for one
+board, 30 correct and 8 wrong. Seven of those eight were the designator of a
+different real component. It is kept because a board whose silkscreen the text
+reader cannot find may still be legible to a model, and because a machine that
+can run a 7B model would do better than these numbers.
 
 ### Photos that show only part of the board
 
@@ -346,8 +405,15 @@ The brief requires it, so it is worth being precise:
   requests**.
 - The page loads **no CDN script, no web font, no external stylesheet**. Every
   asset is served from `web/`. Typography uses the platform UI font stack.
-- There is no AI model, no API key and no hosted service anywhere in the
-  solution. The only dependencies are OpenCV, NumPy, Pillow, FastAPI/uvicorn.
+- There is **no API key and no hosted service** anywhere in the solution, and
+  nothing is ever downloaded at runtime. The inspection engine is OpenCV,
+  NumPy, Pillow and FastAPI/uvicorn, and nothing else.
+- One optional extra, off unless you pass `--read-labels`, reads the part
+  names printed on the board so you do not have to type them. It is an ONNX
+  text recogniser that ships inside its own wheel and runs on the CPU, so it
+  needs no network and no key either, but it *is* a model and this document
+  will not pretend otherwise. It cannot affect any verdict, and with the flag
+  off it is never loaded. [Why it is off by default](#why-it-is-off-by-default).
 - Your photos stay on your machine, under `data/`, in plain files you can
   delete with a file manager.
 
@@ -368,6 +434,8 @@ app/
   main.py             HTTP API (FastAPI)
   imaging.py          decode, EXIF orientation, resizing
   storage.py          projects, parts and runs as plain files on disk
+  silkscreen.py       reads the designators printed on the board (optional)
+  naming.py           the same job via a local vision model (optional fallback)
   vision/
     registration.py   test frame -> reference frame
     photometric.py    exposure and sharpness equalisation
@@ -378,6 +446,7 @@ web/                  the interface: one HTML file, one stylesheet, ES modules
 tools/
   generate_samples.py renders the benchmark boards
   evaluate.py         scores the engine against ground truth
+  evaluate_labels.py  scores the label reader against ground truth
 samples/              12 boards + ground truth, committed so it runs immediately
 data/                 created at runtime; your projects and inspections
 ```

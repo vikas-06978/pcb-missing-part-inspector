@@ -9,6 +9,7 @@ Binds to 127.0.0.1 only and opens your browser. Nothing leaves the machine.
 from __future__ import annotations
 
 import argparse
+import os
 import socket
 import sys
 import threading
@@ -91,7 +92,24 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=8000, help="Preferred port (default 8000)")
     parser.add_argument("--no-browser", action="store_true", help="Do not open a browser")
     parser.add_argument("--reload", action="store_true", help="Auto-reload on code changes")
+    parser.add_argument(
+        "--read-labels",
+        action="store_true",
+        help=(
+            "Switch on reading the designators printed on the board, so they "
+            "do not all have to be typed. Off by default: it is the one part "
+            "of this app that uses a model, it never affects a missing or "
+            "present verdict, and it still runs entirely on this machine."
+        ),
+    )
     args = parser.parse_args()
+
+    if args.read_labels:
+        # Imported here rather than at module scope so that --help still
+        # works before the dependencies are installed.
+        from app.naming import ENABLE_FLAG
+
+        os.environ[ENABLE_FLAG] = "1"
 
     check_dependencies()
 

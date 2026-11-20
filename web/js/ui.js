@@ -45,7 +45,9 @@ function dismiss(node) {
  * about to lose its parts, and the destructive action here (replacing a
  * reference) throws away work the operator spent several minutes on.
  */
-export function confirmAction({ title, body, confirmLabel = 'Confirm', danger = false }) {
+export function confirmAction({
+  title, body, confirmLabel = 'Confirm', cancelLabel = 'Cancel', danger = false,
+}) {
   return new Promise((resolve) => {
     const dialog = document.createElement('dialog');
     dialog.className = 'sheet';
@@ -53,13 +55,14 @@ export function confirmAction({ title, body, confirmLabel = 'Confirm', danger = 
       <h2></h2>
       <p class="sheet__lead"></p>
       <div class="row row--end">
-        <button class="btn btn--ghost" value="cancel" type="button">Cancel</button>
+        <button class="btn btn--ghost" value="cancel" type="button"></button>
         <button class="btn ${danger ? '' : 'btn--primary'}" value="ok" type="button"></button>
       </div>`;
 
     dialog.querySelector('h2').textContent = title;
     dialog.querySelector('.sheet__lead').textContent = body;
 
+    dialog.querySelector('[value="cancel"]').textContent = cancelLabel;
     const okButton = dialog.querySelector('[value="ok"]');
     okButton.textContent = confirmLabel;
     if (danger) {

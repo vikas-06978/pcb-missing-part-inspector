@@ -42,7 +42,7 @@ const MARQUEE_MIN = 4;       // screen px before a click becomes a drag
 
 let nextLocalId = 1;
 /** A name the app generated, as opposed to one a person chose. */
-const isPlaceholder = (name) => /^part\s*\d+$/i.test(String(name).trim());
+export const isPlaceholder = (name) => /^part\s*\d+$/i.test(String(name).trim());
 
 const makeId = () => `n${(nextLocalId++).toString(36)}${Date.now().toString(36).slice(-4)}`;
 

@@ -332,3 +332,56 @@ MIN_PART_COVERAGE = 0.70
 
 APP_NAME = "PCB Missing-Component Inspector"
 APP_VERSION = "1.0.0"
+
+
+# --------------------------------------------------------------------------
+# Reading the printed designators (a typing shortcut, never a verdict)
+# --------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class SilkscreenConfig:
+    """Tunables for app.silkscreen.
+
+    Nothing here can change a missing/present decision. The worst a bad value
+    can do is leave more names for the operator to type. Every length is a
+    multiple of the board's own printed text height, measured from the board
+    during the survey pass, so these hold at any image size.
+    """
+
+    #: Enlargement for the one survey pass over the whole board. Three times
+    #: is enough to locate labels; the survey only has to find a minority of
+    #: them, and reading the full board larger costs seconds for no gain.
+    survey_upscale: float = 3.0
+
+    #: Below this many designator-shaped strings the board is not one this
+    #: reader understands, so it declines rather than inventing a convention
+    #: from two or three readings.
+    min_seeds: int = 6
+
+    #: How far from a part, in text heights, a label may sit and still be
+    #: considered a candidate for it. Generous on purpose: wrong pairings are
+    #: expected and disagree with each other, so they cost accuracy nothing.
+    pairing_reach: float = 9.0
+
+    #: How close two offsets must be, in text heights, to count as the same
+    #: convention. Roughly one character.
+    offset_tolerance: float = 1.2
+
+    #: Fewer agreeing pairs than this is not a convention, it is a
+    #: coincidence, so the reader declines and every name is typed.
+    min_votes: int = 6
+
+    #: Half-size of the strip read for one label, in text heights. Wide enough
+    #: for a four-character designator, tight enough to exclude the next one.
+    #: Measured: widening it to 4.6 lost two labels to neighbouring text.
+    strip_half_width: float = 3.4
+    strip_half_height: float = 1.4
+
+    #: Target glyph height in pixels when the strip is enlarged for reading.
+    #: Swept over two boards: 80 read 61 of 82 labels, 100 read 64, and going
+    #: wider as well as larger started producing wrong answers.
+    strip_text_height: float = 100.0
+
+    #: Used only if the survey found text but could not measure its height.
+    fallback_text_height: float = 10.0

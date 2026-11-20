@@ -187,10 +187,16 @@
 
       <aside class="editor__side">
         <div class="side-head">
-          <h3>Parts <span class="count-pill" id="parts-count">0</span></h3>
+          <h3>Parts <span class="count-pill" id="parts-count">0</span>
+            <span class="count-pill count-pill--todo is-hidden" id="parts-remaining">0 to name</span></h3>
           <div class="row">
+          <button class="btn btn--ghost btn--sm" id="review-names" type="button" disabled
+                  title="See every part as a picture with the name you gave it, to check them before inspecting.">
+            <svg viewBox="0 0 24 24" class="btn__icon" aria-hidden="true"><path d="M4 5h7v6H4zM13 5h7v6h-7zM4 13h7v6H4zM13 13h7v6h-7z"/></svg>
+            Review names
+          </button>
           <button class="btn btn--ghost btn--sm is-hidden" id="read-names" type="button"
-                  title="Read the printed designators with a local Ollama model">
+                  title="Read the designators printed on the board, on this machine">
             <svg viewBox="0 0 24 24" class="btn__icon" aria-hidden="true"><path d="M3.5 12s3.4-6 8.5-6 8.5 6 8.5 6-3.4 6-8.5 6-8.5-6-8.5-6Z"/><circle cx="12" cy="12" r="2.4"/></svg>
             Read labels
           </button>
@@ -399,6 +405,34 @@
           title="Close" aria-label="Close part inspector">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
   </button>
+</div>
+
+<!--
+  Name review. Forty names typed in a list are forty chances to put the right
+  name on the wrong row, and a list of text cannot show you that: every row
+  looks correct. Seeing each part as a picture with the name underneath is
+  how you actually catch it, so this is the last thing before inspecting.
+-->
+<div class="review" id="review" inert>
+  <header class="review__head">
+    <div>
+      <h2>Check the names</h2>
+      <p class="review__sub" id="review-sub">Every part as it looks on the board.</p>
+    </div>
+    <div class="review__tools">
+      <label class="review__filter">
+        <input type="checkbox" id="review-only-unnamed">
+        Only the ones still to name
+      </label>
+      <button class="btn btn--primary btn--sm" id="review-done" type="button">Done</button>
+      <button class="icon-btn" id="review-close" type="button"
+              title="Close" aria-label="Close review">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+  </header>
+  <div class="review__grid" id="review-grid"></div>
+  <p class="review__empty is-hidden" id="review-empty">Nothing left to name.</p>
 </div>
 
 <div class="toasts" id="toasts" aria-live="polite"></div>

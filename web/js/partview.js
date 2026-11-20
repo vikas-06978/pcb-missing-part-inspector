@@ -157,8 +157,13 @@ export class PartView {
       `${part.bbox[0]}, ${part.bbox[1]}`;
     this.root.querySelector('#partview-size').textContent =
       `${part.bbox[2]} x ${part.bbox[3]} px`;
+    // How much is left, not just where you are. Working through forty parts
+    // one slab at a time, "12 of 41" says nothing about how many of the other
+    // twenty-nine still need typing, and that is the question being asked.
+    const left = parts.filter((p) => /^part \d+$/i.test(p.name.trim())).length;
     this.root.querySelector('#partview-index').textContent =
-      `${index + 1} of ${parts.length}`;
+      left ? `${index + 1} of ${parts.length} · ${left} to name`
+           : `${index + 1} of ${parts.length} · all named`;
     this.root.querySelector('#partview-state').textContent =
       unnamed ? 'Not named yet' : 'Named';
     this.root.querySelector('#partview-state').classList.toggle('is-unnamed', unnamed);

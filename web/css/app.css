@@ -1571,3 +1571,157 @@ dialog::backdrop { background: rgba(3, 6, 11, 0.68); backdrop-filter: blur(5px);
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
 }
+
+/* --------------------------------------------------------------------------
+   Naming progress
+
+   Forty rows all look alike and "Part 31" reads like a name until you look
+   twice, so the ones still carrying a generated name are marked, and the
+   count of what is left is kept in view while you work.
+   -------------------------------------------------------------------------- */
+
+.count-pill--todo {
+  background: var(--review-soft);
+  color: var(--review);
+}
+.count-pill--todo.is-done {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.part-row.is-unnamed .part-row__name {
+  color: var(--text-dim);
+  font-weight: 450;
+  font-style: italic;
+}
+.part-row.is-unnamed::before {
+  content: "";
+  width: 3px;
+  height: 17px;
+  margin-left: -5px;
+  margin-right: -1px;
+  border-radius: 99px;
+  background: var(--review);
+  flex: none;
+}
+
+/* --------------------------------------------------------------------------
+   Name review
+
+   A grid of photographs rather than a list of text, because the mistake this
+   step exists to catch, a name that landed on the part next door, is
+   invisible in a list and obvious in a picture.
+   -------------------------------------------------------------------------- */
+
+.review {
+  position: fixed;
+  inset: 0;
+  z-index: 85;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s var(--ease);
+}
+.review.is-open { opacity: 1; pointer-events: auto; }
+
+.review__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex: none;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+.review__head h2 { margin: 0; font-size: 1.02rem; }
+.review__sub {
+  margin: 3px 0 0;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+}
+.review__tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.review__filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  cursor: pointer;
+  user-select: none;
+}
+
+.review__grid {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+  padding: 20px 22px 28px;
+  align-content: start;
+}
+.review__empty {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-dim);
+}
+
+.review-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 10px 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.review-card.is-unnamed {
+  border-color: var(--review);
+  background: var(--review-soft);
+}
+.review-card__thumb {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 136px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  cursor: zoom-in;
+  overflow: hidden;
+}
+.review-card__thumb canvas {
+  display: block;
+  border-radius: var(--radius-sm);
+}
+.review-card__thumb:hover { outline: 2px solid var(--brand); outline-offset: 1px; }
+.review-card__name {
+  width: 100%;
+  padding: 4px 7px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-align: center;
+}
+.review-card__name:focus {
+  outline: none;
+  border-color: var(--brand);
+}
+.review-card__index {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
