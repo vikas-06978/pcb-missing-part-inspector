@@ -9,7 +9,7 @@
 
 import { api, ApiError } from './api.js';
 import {
-  toast, confirmAction, loadImage, imageFilesFrom, downloadBlob, formatBytes,
+  toast, confirmAction, promptText, loadImage, imageFilesFrom, downloadBlob, formatBytes,
 } from './ui.js';
 import { Annotator, isPlaceholder } from './annotator.js';
 import { PartView } from './partview.js';
@@ -1027,10 +1027,18 @@ async function main() {
   });
 
   $('#project-name').addEventListener('click', async () => {
-    const name = prompt('Name this board', state.project.name);
+    const name = await promptText({
+      title: 'Name this board',
+      body: 'This goes at the top of the exported report, so use whatever '
+        + 'identifies the board to whoever reads it.',
+      label: 'Board name',
+      value: state.project.name === 'Untitled board' ? '' : state.project.name,
+      confirmLabel: 'Save name',
+    });
     if (name === null) return;
-    state.project = await api.patchProject({ name: name.trim() || state.project.name });
+    state.project = await api.patchProject({ name });
     $('#project-name').textContent = state.project.name;
+    toast('Board renamed', `Reports will say "${state.project.name}".`);
   });
 
   // Save pending part edits if the tab is closed or hidden mid-session.

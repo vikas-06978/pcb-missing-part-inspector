@@ -574,6 +574,86 @@ this app runs no model of any kind" is still a true sentence.
 
 ---
 
+## Decision 19: the benchmark was only testing the easy case
+
+**Asked for:** renaming the board did nothing when clicked, and "photos dark
+hona, blur hona, different angle se lena ... we want reliable results".
+
+The rename was a five-minute bug with a wider lesson: it called
+`window.prompt`, which several embedded webviews disable and return null from
+without showing anything. Clicking did nothing, silently, with no error. It
+now uses the app's own dialog, like everything else does.
+
+The second half was the real work, and the first thing to admit is that I
+could not answer the question. I had said a few days of work earlier that the
+engine handles dim and harsh lighting, because the benchmark contained boards
+labelled dim and harsh. What the benchmark actually contained was a camera
+bolted to a bench: a nudge of a degree, exposure drift, mild defocus, JPEG.
+There was no perspective in it at all. Somebody holding a phone over a board
+was simply not represented, so "does it handle a different angle" had no
+measured answer and I should not have implied otherwise.
+
+**So the first change was to the benchmark, not the engine.** Added: held at
+an angle, underexposed, somebody leaning over the board, a flash off the
+solder mask, focus missed. The existing boards regenerate byte for byte, so
+every earlier number still stands.
+
+The engine scored **49.8% precision** on them. Recall stayed at 100%.
+
+**Then I guessed wrong three times, and measuring stopped it each time.**
+
+I assumed the angle was the problem, since it was the new thing. Probed the
+alignment: SIFT recovered the tilt on every board, nothing rejected,
+perspective terms a factor of ten inside the envelope. Not the angle.
+
+I assumed glare was destroying the parts underneath it, and built a rule to
+send those parts for review instead of calling them missing. Measured the
+saturation: zero, everywhere. Then measured which parts the false alarms
+actually were: *not the ones under the highlight*. The rule I had just
+written was aimed at the wrong parts, and worse, it suppressed eleven real
+removals, because lifting a dark chip off a board leaves something brighter
+behind, which is exactly what my highlight detector was looking for. A
+detector for reflections that fires on missing components is not a safety
+feature, it is a way to miss faults. Deleted.
+
+I assumed it was one dominant nuisance. Ablated them one at a time: angle
+100%, blur 100%, dark 100%, shadow 100%, noise 100%, glare 77%. Then ran
+everything *except* glare: also 77%. No single cause. The nuisances stack.
+
+**What the measurements eventually said.** The separation was still good: a
+genuinely missing part outscored every present one on 38 boards in 42. The
+ordering was right and the calibration was wrong, so the answer was not a
+better filter but a better line. Each photograph is now judged against its
+own noise floor as well as the fixed threshold.
+
+The part I want to keep is where that line is allowed to act. Raising it to
+decide present against missing buys precision by missing real removals, and
+for an inspection tool that is backwards: a false alarm costs a second look,
+a missed removal ships a faulty board. So it decides *stated missing* against
+*sent for review* instead. Nothing is hidden, everything the old threshold
+flagged is still flagged, and what changes is whether the tool asserts it or
+asks about it.
+
+| | before | after |
+|---|---|---|
+| Missed removals | 0 | 0 |
+| Precision of stated missing | ~50% | 88% |
+| Boards exactly right | 33 / 60 | 44 / 60 |
+| Bench benchmark | 80/80 | 80/80, unchanged |
+
+It costs about a second a board, from the per-part local lighting
+correction, and that is in the README too.
+
+**What I would flag to a reviewer.** 58% of everything flagged is still
+spurious on hand-held photographs; those now arrive as review items rather
+than assertions, which is honest but is not the same as being right. And a
+rendered model of a bad photograph is still a model. The useful claim is
+narrower than "it handles bad photos": it is that the failure is understood,
+that it degrades into questions rather than into wrong answers, and that it
+has never yet missed a removal.
+
+---
+
 ## What the AI was better at, and where it needed holding
 
 **Better:** breadth and speed. Six evidence channels, a homography

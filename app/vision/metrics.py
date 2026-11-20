@@ -295,3 +295,19 @@ def normalised_residual(reference_gray: np.ndarray, test_gray: np.ndarray) -> fl
 def mean_intensity_shift(reference_gray: np.ndarray, test_gray: np.ndarray) -> float:
     """Absolute difference of patch means, normalised to 0..1."""
     return float(abs(float(reference_gray.mean()) - float(test_gray.mean())) / 255.0)
+
+
+def saturated_fraction(patch_bgr: np.ndarray, level: int = 247) -> float:
+    """Fraction of a patch that is blown out to white.
+
+    A reflection off the solder mask does not darken or distort the component
+    underneath, it deletes it: every channel pegs at the top of the range and
+    nothing about the pixel depends any more on what was there. No comparison
+    can recover that, so the honest use of this number is to decline the
+    measurement rather than to correct it.
+    """
+    if patch_bgr.size == 0:
+        return 0.0
+    if patch_bgr.ndim == 2:
+        return float((patch_bgr >= level).mean())
+    return float((patch_bgr.min(axis=2) >= level).mean())

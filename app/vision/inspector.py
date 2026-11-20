@@ -39,11 +39,16 @@ from app.config import (
     STATE_MISSING,
     STATE_NOT_VISIBLE,
     STATE_PRESENT,
+    GLARE_BOARD_FRACTION,
+    GLARE_RATIO,
+    ADAPTIVE_THRESHOLD_CAP,
+    ADAPTIVE_THRESHOLD_K,
     STATE_REVIEW,
     VETO,
     WEIGHTS,
 )
 from app.vision import metrics as M
+from app.vision import photometric as P
 from app.vision.photometric import board_mask, match_levels, match_sharpness
 from app.vision.registration import Alignment, align, coverage_mask, warp_to_reference
 
@@ -179,6 +184,27 @@ def _patch(image: np.ndarray, x: int, y: int, w: int, h: int) -> np.ndarray | No
 # --------------------------------------------------------------------------
 
 
+def _surround_pixels(
+    image: np.ndarray, x: int, y: int, w: int, h: int, margin: int
+) -> np.ndarray:
+    """The board just outside a component's box, as a flat list of pixels.
+
+    Used to measure the light on this part without looking at the part. The
+    box itself is cut out, so what comes back is bare board, pads and
+    silkscreen, all of which are there whether or not the component is.
+    """
+    height, width = image.shape[:2]
+    x0, y0 = max(0, x - margin), max(0, y - margin)
+    x1, y1 = min(width, x + w + margin), min(height, y + h + margin)
+    window = image[y0:y1, x0:x1]
+    if window.size == 0:
+        return np.empty((0, 3), image.dtype)
+
+    keep = np.ones(window.shape[:2], bool)
+    keep[max(0, y - y0):max(0, y - y0) + h, max(0, x - x0):max(0, x - x0) + w] = False
+    return window[keep]
+
+
 def _analyse_part(
     reference_bgr: np.ndarray,
     aligned_bgr: np.ndarray,
@@ -228,6 +254,17 @@ def _analyse_part(
     if ref_body is None or test_body is None:
         ref_body, test_body = ref_patch, test_patch
 
+    # --- correct for the light falling on this part -------------------------
+    # Sample the board surrounding the component, in both photographs, and
+    # scale the test patch by the ratio. A shadow or a highlight lying across
+    # part of the board is local, so the global exposure match cannot see it;
+    # this can, because it only ever compares bare board against bare board.
+    # The component's own pixels are excluded from the estimate, so a part
+    # that really is missing cannot talk its way into looking present.
+    ring_ref = _surround_pixels(reference_bgr, x, y, w, h, margin)
+    ring_test = _surround_pixels(aligned_bgr, x + dx, y + dy, w, h, margin)
+    test_body, local_gain = P.match_levels_around(ring_ref, ring_test, test_body)
+
     # --- measurements -------------------------------------------------------
     ref_small = M.ensure_min_size(ref_body)
     test_small = M.ensure_min_size(test_body)
@@ -248,6 +285,12 @@ def _analyse_part(
         "intensity_shift": M.mean_intensity_shift(ref_gray, test_gray),
         "ref_edge_density": M.edge_density(ref_gray),
         "test_edge_density": M.edge_density(test_gray),
+        "local_gain": float(local_gain),
+        # How much of this part the light has burned away. Saturated pixels
+        # carry no information about what is underneath them, so a part lying
+        # under a reflection cannot be judged present or absent at all.
+        "blown_out": M.saturated_fraction(test_small),
+        "ref_blown_out": M.saturated_fraction(ref_small),
         "ref_contrast": float(ref_gray.std()),
         "test_contrast": float(test_gray.std()),
     }
@@ -349,7 +392,25 @@ def inspect(
     warped = warp_to_reference(test_bgr, alignment.matrix, reference_bgr.shape)
 
     mask = board_mask(reference_bgr)
-    aligned, photometric = match_levels(warped, reference_bgr, mask)
+
+    # Keep any reflection out of the exposure match. A highlight is a small
+    # patch of very bright pixels, and the whole-image statistics are not
+    # blind to it: it drags the median and the spread, so the correction
+    # computed from them is wrong everywhere *else*. Measured, that indirect
+    # damage was the whole story. The parts a reflection made the engine call
+    # missing were not the parts underneath it; they were ordinary parts
+    # across the board, mis-levelled because a highlight in one corner had
+    # set the exposure for all of them.
+    bare = board_mask(reference_bgr).copy()
+    rh, rw = reference_bgr.shape[:2]
+    for part in part_list:
+        px, py, pw, ph = _clamp_bbox(part["bbox"], rw, rh)
+        bare[py:py + ph, px:px + pw] = 0
+    highlight = P.light_anomaly_mask(reference_bgr, warped, bare, GLARE_RATIO)
+    level_mask = cv2.bitwise_and(mask, cv2.bitwise_not(highlight))
+    if np.count_nonzero(level_mask) < 0.2 * max(np.count_nonzero(mask), 1):
+        level_mask = mask          # nothing trustworthy left; use what there is
+    aligned, photometric = match_levels(warped, reference_bgr, level_mask)
 
     # Equalise focus before measuring anything. ``reference_for_measurement``
     # may be a blurred copy; the untouched ``reference_bgr`` is still what the
@@ -369,6 +430,10 @@ def inspect(
         region = visible[py:py + ph, px:px + pw]
         coverages.append(float(np.count_nonzero(region)) / max(region.size, 1))
 
+    # Where a reflection has washed the board out. Measured on the
+    # illumination alone, so printed detail and components do not register.
+    glare = highlight
+    glare_board_fraction = float(np.count_nonzero(glare)) / max(glare.size, 1)
     raw: list[tuple[dict[str, float], dict[str, float], tuple[int, int]]] = []
     for part in part_list:
         raw.append(
@@ -387,6 +452,32 @@ def inspect(
                 SCENE.max_subtraction,
                 SCENE.strength * (median - SCENE.trigger_median),
             )
+
+    # --- this photograph's own noise floor ----------------------------------
+    # A hand-held photo brings several nuisances at once, and they stack: each
+    # one on its own leaves the engine well inside its margins, but together
+    # the scores of present parts drift upward and some cross the fixed line.
+    # The ordering survives, a genuinely missing part still outscores every
+    # present one on nine boards in ten, so the useful question is not "is
+    # this above 0.52" but "does this stand out from the rest of this photo".
+    #
+    # What it must not do is hide anything. Raising the line to decide
+    # present/missing buys precision by missing real removals, and for an
+    # inspection tool that is the wrong way round: a false alarm costs a
+    # second look, a missed removal ships a faulty board. So the floor
+    # separates *confident* from *worth checking* instead. Everything the
+    # fixed threshold would have flagged is still flagged; what changes is
+    # whether it is stated as a fact or put in front of the operator.
+    confident_threshold = preset.missing_threshold
+    if ADAPTIVE_THRESHOLD_K > 0 and len(judged) >= SCENE.min_parts:
+        middle = float(np.median(judged))
+        spread = 1.4826 * float(np.median(np.abs(np.asarray(judged) - middle)))
+        floor = middle + ADAPTIVE_THRESHOLD_K * spread
+        confident_threshold = float(np.clip(
+            max(confident_threshold, floor),
+            preset.missing_threshold,
+            ADAPTIVE_THRESHOLD_CAP,
+        ))
 
     warnings = list(alignment.warnings)
 
@@ -411,6 +502,14 @@ def inspect(
             "under current lighting will be more reliable."
         )
 
+    if glare_board_fraction >= GLARE_BOARD_FRACTION:
+        warnings.append(
+            f"A reflection covers about {glare_board_fraction * 100:.0f}% of this "
+            "photo. Parts under it cannot be judged, because a highlight hides a "
+            "fitted component and an empty footprint equally well. Re-shoot "
+            "without the flash, or move the lamp off the board's axis."
+        )
+
     verdicts: list[PartVerdict] = []
     for part, (signals, scores, offset), raw_confidence, coverage in zip(
         part_list, raw, raw_confidences, coverages
@@ -427,8 +526,18 @@ def inspect(
                 else f"Only {coverage * 100:.0f}% of this part is in the photograph, "
                      "which is too little to judge."
             )
-        elif confidence >= preset.missing_threshold:
+        elif confidence >= confident_threshold:
             state = STATE_MISSING
+        elif confidence >= preset.missing_threshold:
+            # Over the fixed line, but not clear of what this photograph is
+            # doing to every other part on the board. Still shown, stated as
+            # a thing to check rather than a thing that is so.
+            state = STATE_REVIEW
+            reason = (
+                "This scores as missing, but this photo is making a lot of parts "
+                "look altered, so it does not stand out enough to be called. "
+                "Check it, or re-shoot the board more evenly lit and square on."
+            )
         elif confidence >= preset.review_threshold:
             state = STATE_REVIEW
         else:

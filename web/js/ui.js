@@ -90,6 +90,67 @@ export function confirmAction({
   });
 }
 
+/**
+ * Ask for a line of text, in the app's own dialog rather than the browser's.
+ *
+ * window.prompt is not available everywhere this app runs: several embedded
+ * webviews, the desktop shells among them, disable it and return null without
+ * showing anything. Renaming a board simply did nothing there, with no error
+ * to go on, which is the worst kind of broken. This also lets the field be
+ * styled, pre-selected and submitted with Enter.
+ */
+export function promptText({ title, body = '', label, value = '', confirmLabel = 'Save' }) {
+  return new Promise((resolve) => {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'sheet';
+    dialog.innerHTML = `
+      <h2></h2>
+      <p class="sheet__lead"></p>
+      <label class="sheet__field">
+        <span></span>
+        <input type="text" maxlength="120" spellcheck="false">
+      </label>
+      <div class="row row--end">
+        <button class="btn btn--ghost" value="cancel" type="button">Cancel</button>
+        <button class="btn btn--primary" value="ok" type="button"></button>
+      </div>`;
+
+    dialog.querySelector('h2').textContent = title;
+    const lead = dialog.querySelector('.sheet__lead');
+    lead.textContent = body;
+    lead.classList.toggle('is-hidden', !body);
+    dialog.querySelector('.sheet__field span').textContent = label;
+    dialog.querySelector('[value="ok"]').textContent = confirmLabel;
+
+    const input = dialog.querySelector('input');
+    input.value = value;
+
+    const close = (result) => {
+      dialog.close();
+      dialog.remove();
+      resolve(result);
+    };
+
+    dialog.querySelector('[value="ok"]')
+      .addEventListener('click', () => close(input.value.trim() || null));
+    dialog.querySelector('[value="cancel"]').addEventListener('click', () => close(null));
+    dialog.addEventListener('cancel', (event) => {
+      event.preventDefault();
+      close(null);
+    });
+    input.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      close(input.value.trim() || null);
+    });
+
+    document.body.appendChild(dialog);
+    dialog.showModal();
+    input.focus();
+    input.select();
+  });
+}
+
 /** Read a themed colour token so canvas drawing matches the stylesheet. */
 export function cssVar(name, fallback = '#888') {
   const value = getComputedStyle(document.documentElement).getPropertyValue(name);

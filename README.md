@@ -118,14 +118,92 @@ actually *present* reaches 0.373, and the weakest genuine removal reaches
 0.652. Every threshold in that gap scores perfectly, so the presets sit inside
 it rather than balanced on an edge.
 
-About **0.9 s per board** for 41 parts on a laptop CPU.
+About **1.9 s per board** for 41 parts on a laptop CPU.
+
+That benchmark assumes a camera on a bench: the fixture nudges, the light
+drifts, the lens is a touch soft, the frame grabber compresses. It is the
+right model for a jig and the wrong one for a person with a phone, so there
+is a second one.
+
+### Photographed by hand
+
+Same boards, photographed the way they actually get photographed: **held at
+an angle**, **underexposed**, **somebody leaning over the board**, **a flash
+reflecting off the solder mask**, **focus missed**, and a hard JPEG on top.
+60 boards, 2,460 part decisions.
+
+| | Bench camera | By hand |
+|---|---|---|
+| Missed removals | **0** | **0** |
+| A part stated missing, wrongly | **0** | 15 of 129 |
+| Precision of stated missing | **100%** | **88%** |
+| Sent for review instead | 0 | 74 |
+| Boards exactly right | 80 / 80 | 44 / 60 |
+
+**Nothing is ever missed, under any condition tested.** That is the property
+worth protecting: a false alarm costs a second look, a missed removal ships a
+faulty board. What degrades is how much of the output is stated as fact
+rather than put up for review.
+
+#### Which conditions actually matter
+
+Each nuisance measured on its own, 30 boards each, so the answer is not a
+guess:
+
+| Condition | Precision | Verdict |
+|---|---|---|
+| Held at an angle (perspective) | 100% | Handled. SIFT recovers the tilt on every board; nothing was ever rejected. |
+| Out of focus | 100% | Handled, by equalising sharpness before measuring. |
+| Underexposed | 100% | Handled. |
+| Shadow across the board | 100% | Handled. |
+| Sensor noise and hard JPEG | 100% | Handled. |
+| Flash reflection | 77% | Not fully handled. |
+
+The surprise is in the last two rows of arithmetic rather than the list: every
+condition alone is fine, any *combination* lands near 77%, and all of them
+together reach 58% before the measures below. Nothing is individually broken.
+The nuisances stack, the scores of present parts drift upward together, and a
+few cross a line that was drawn for cleaner photographs.
+
+So the fix is not a better filter, it is a better line:
+
+- **Each photograph is judged against its own noise floor.** A part is stated
+  missing only if it stands clear of what this photo is doing to every other
+  part on the board, measured as a robust deviation from the middle of the
+  scores. This decides *stated missing* against *sent for review*, never
+  against *present*: it can move a verdict from an assertion to a question,
+  but it can never make one disappear. That is why recall stays at 100%.
+- **Each part is corrected for the light on its own patch of board.** The
+  ring of bare board around a component is the same board in both photographs
+  whether or not the part is fitted, so the difference there is light, not
+  absence. Matching its level and its spread undoes a local shadow, which a
+  whole-image exposure match cannot see.
+- **A reflection is kept out of the exposure match.** A highlight drags the
+  whole-image statistics, so the correction computed from them is wrong
+  everywhere *else*. The parts a reflection made the engine call missing were
+  never the parts underneath it.
+
+#### Reproduce it
+
+```bash
+python tools/generate_samples.py --stress 60 --hard --out samples_handheld
+python tools/evaluate.py --samples samples_handheld --worst 10
+
+# one condition at a time
+python tools/generate_samples.py --stress 30 --hard --only glare --out samples_glare
+python tools/evaluate.py --samples samples_glare
+```
+
+`--only` takes any of `tilt, dark, shadow, glare, blur, noise`.
 
 > **Read this honestly.** The benchmark is rendered, not photographed. Real
-> boards glint, sit at slight angles, and collect dust. These numbers are
-> evidence that the design is sound and the thresholds are not knife-edge,
+> boards glint, sit at slight angles, and collect dust, and the hand-held
+> model above is a model of those things rather than the things themselves.
+> These numbers are evidence that the design is sound, that it degrades in a
+> way that is understood, and that the thresholds are not knife-edge. They are
 > not a prediction of field accuracy. `RESEARCH.md §4` says more.
 
-### Reproduce it
+### Reproduce the bench numbers
 
 ```bash
 python tools/generate_samples.py                              # the 12 shipped boards

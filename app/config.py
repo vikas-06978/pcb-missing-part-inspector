@@ -239,6 +239,22 @@ class SceneCompensation:
 
 SCENE = SceneCompensation()
 
+#: Judge each photograph against its own noise floor as well as the fixed
+#: threshold. Under a single nuisance the engine is comfortably inside its
+#: margins, but a hand-held photo brings several at once and the scores of
+#: *present* parts creep upward together. Measured on such photos, the
+#: ordering stays right, a missing part still scores well above every present
+#: one on 38 of 42 boards, but the fixed line sits too low and a handful of
+#: present parts cross it. So the line is also placed this many robust
+#: deviations above the middle of the scores on this photo, and the stricter
+#: of the two is used. It can only ever raise the bar, never lower it, so it
+#: cannot turn a part the fixed threshold would have caught into a pass.
+#: Zero switches it off.
+ADAPTIVE_THRESHOLD_K = 3.0
+
+#: Never let the adaptive line rise above this, however strange the photo.
+ADAPTIVE_THRESHOLD_CAP = 0.80
+
 
 @dataclass(frozen=True)
 class SensitivityPreset:
@@ -314,6 +330,25 @@ SUGGEST = SuggestConfig()
 # --------------------------------------------------------------------------
 # Presentation
 # --------------------------------------------------------------------------
+
+#: A highlight is called a highlight when the light on the test photo is this
+#: much stronger than on the reference, measured after both are blurred down
+#: to the illumination alone.
+GLARE_RATIO = 1.30
+
+# A per-part version of this was tried: if a highlight covered most of a
+# part, its missing verdict was downgraded to review, on the reasoning that a
+# reflection hides a fitted part and an empty footprint equally well. It was
+# removed after measurement. Ablating the nuisances one at a time showed that
+# reflections were never what drove the false alarms, and the rule suppressed
+# eleven real removals, because lifting a dark chip off the board leaves
+# something brighter behind and that is what a highlight looks like. The
+# highlight mask is now measured on bare board only and used for the exposure
+# match and the warning, never to silence a part.
+
+#: Fraction of the whole board under a highlight before the operator is told
+#: to retake the photograph.
+GLARE_BOARD_FRACTION = 0.02
 
 STATE_PRESENT = "present"
 STATE_MISSING = "missing"

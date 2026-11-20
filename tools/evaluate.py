@@ -88,12 +88,25 @@ def run_all(
 def score(results: list[dict]) -> dict:
     tp = fp = fn = tn = 0
     review_hits = review_false = 0
+    # Counted separately: how often the report *states* a part is missing and
+    # is wrong. The figures above treat a review as a flag, deliberately, so
+    # that the review band cannot be used to hide false alarms. But a review
+    # asks the operator to look, while a missing is an assertion, and an
+    # assertion that is wrong one time in three is a different kind of
+    # problem from a question that is asked too often.
+    stated_right = stated_wrong = 0
 
     for entry in results:
         missing_truth = set(entry["case"]["missing"])
         for verdict in entry["verdicts"]:
             actually_missing = verdict.name in missing_truth
             flagged = verdict.state in (STATE_MISSING, STATE_REVIEW)
+
+            if verdict.state == STATE_MISSING:
+                if actually_missing:
+                    stated_right += 1
+                else:
+                    stated_wrong += 1
 
             if actually_missing and flagged:
                 tp += 1
@@ -123,6 +136,11 @@ def score(results: list[dict]) -> dict:
         "tp": tp, "fp": fp, "fn": fn, "tn": tn,
         "precision": precision, "recall": recall, "f1": f1,
         "review_hits": review_hits, "review_false": review_false,
+        "stated_right": stated_right, "stated_wrong": stated_wrong,
+        "stated_precision": (
+            stated_right / (stated_right + stated_wrong)
+            if (stated_right + stated_wrong) else 1.0
+        ),
         "board_exact": board_correct, "board_total": len(results),
         "decisions": tp + fp + fn + tn,
     }
@@ -254,6 +272,8 @@ def main() -> None:
         print(f"  boards exact       {stats['board_exact']}/{stats['board_total']}")
         print(f"  review band        {stats['review_hits']} real, "
               f"{stats['review_false']} spurious")
+        print(f"  stated missing     {stats['stated_precision'] * 100:.1f}% right "
+              f"({stats['stated_wrong']} parts wrongly stated missing)")
         print(f"  alignment quality  {np.mean(quality):.3f} "
               f"(worst {np.min(quality):.3f})")
         print(f"  time per board     {np.mean(elapsed):.0f} ms "
