@@ -191,7 +191,7 @@ know:
 | `Shift` + drag on empty | Marquee select |
 | `Shift` + click | Add to or remove from the selection |
 | `Alt` + drag | Duplicate as you drag |
-| Double-click a box, `F2` | Rename |
+| Double-click a box, `F2`, `Enter` | Open the part inspector |
 | `Enter` while naming | Save and jump to the next part |
 | `Ctrl`+`A` / `Ctrl`+`D` | Select all / duplicate |
 | Arrows, `Shift`+arrows | Nudge 1 px / 10 px |
@@ -200,6 +200,20 @@ know:
 
 Boxes snap to their neighbours' edges and centres as you drag, with guides, so
 a row of passives lines up without fighting the mouse.
+
+### Looking at a part closely
+
+Double-click any box, or press **Inspect & name**, and that component lifts off
+the board into the middle of the screen. Drag it to turn it, scroll to zoom,
+and type its name on the slab itself. `Enter` saves and jumps to the next part
+that still needs a name, so you can work through a whole board without
+touching the mouse.
+
+It is worth saying what the tilt is and is not. The top face is the real
+photographed pixels. The sides are plain neutral material with no detail,
+because a single overhead photo contains no information about what the sides
+of a component look like. Drawing something there would be the tool inventing
+evidence, which is the one thing an inspection tool must never do.
 
 There is no tool palette on purpose. Figma needs one because it draws a dozen
 kinds of object; here there is exactly one, and a mode you can leave in the

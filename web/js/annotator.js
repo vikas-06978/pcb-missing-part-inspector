@@ -300,6 +300,18 @@ export class Annotator {
 
   // ---- hit testing -------------------------------------------------------
 
+  /** Where a part's box sits in page coordinates, for fly-out animations. */
+  _clientRect(part) {
+    const rect = this._screenRect(part);
+    const canvas = this.view.canvas.getBoundingClientRect();
+    return {
+      left: canvas.left + rect.x,
+      top: canvas.top + rect.y,
+      width: rect.w,
+      height: rect.h,
+    };
+  }
+
   _screenRect(part) {
     const [x, y, w, h] = part.bbox;
     const topLeft = this.view.toScreen(x, y);
@@ -581,7 +593,7 @@ export class Annotator {
           this.view.userMoved = true;
           this._emit();
           this.onSelect(part.id);
-          this.onRenameRequest(part.id);
+          this.onRenameRequest(part.id, this._clientRect(part));
         }
       } else if (this.mode === 'marquee') {
         this.marquee = null;
@@ -603,10 +615,11 @@ export class Annotator {
     canvas.addEventListener('pointercancel', finish);
 
     canvas.addEventListener('dblclick', (event) => {
-      const hit = this._partAt(this.view.pointer(event));
+      const point = this.view.pointer(event);
+      const hit = this._partAt(point);
       if (hit) {
         this.select(hit.id);
-        this.onRenameRequest(hit.id);
+        this.onRenameRequest(hit.id, this._clientRect(hit));
         return;
       }
       // Double-click on empty board brings the whole thing back into view.
@@ -746,9 +759,10 @@ export class Annotator {
         this.deleteSelected();
         return;
       }
-      if (event.key === 'F2' && this.selectedId) {
+      if ((event.key === 'F2' || event.key === 'Enter') && this.selectedId) {
         event.preventDefault();
-        this.onRenameRequest(this.selectedId);
+        const part = this.parts.find((p) => p.id === this.selectedId);
+        this.onRenameRequest(this.selectedId, part ? this._clientRect(part) : null);
         return;
       }
       if (event.key === 'Escape') {

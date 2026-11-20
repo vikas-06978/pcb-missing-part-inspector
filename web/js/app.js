@@ -12,6 +12,7 @@ import {
   toast, confirmAction, loadImage, imageFilesFrom, downloadBlob, formatBytes,
 } from './ui.js';
 import { Annotator } from './annotator.js';
+import { PartView } from './partview.js';
 import {
   DetailView, renderBatchSummary, renderCards, buildReport,
 } from './results.js';
@@ -183,14 +184,7 @@ function createAnnotator() {
       updateZoomReadout();
     },
     onSelect: () => renderPartList(),
-    onRenameRequest: (id) => {
-      const input = document.querySelector(`.part-row[data-id="${id}"] .part-row__name`);
-      if (input) {
-        input.focus();
-        input.select();
-        input.scrollIntoView({ block: 'nearest' });
-      }
-    },
+    onRenameRequest: (id, fromRect) => openPartView(id, fromRect),
   });
   state.annotator.isActive = () => state.step === 'parts';
   state.annotator.view.onChange = () => {
@@ -215,6 +209,25 @@ async function refreshNamingButton() {
   } catch {
     button.classList.add('is-hidden');
   }
+}
+
+/**
+ * Open the part inspector, creating it the first time it is needed.
+ *
+ * Kept out of boot so a board that is only being inspected never builds it.
+ */
+function openPartView(partId, fromRect) {
+  if (!state.annotator?.image) return;
+  if (!state.partView) {
+    state.partView = new PartView({
+      root: $('#partview'),
+      onRename: (id, name) => state.annotator.renamePart(id, name),
+      onRequestParts: () => state.annotator.getParts(),
+      onFocusPart: (id) => state.annotator.focusPart(id),
+    });
+  }
+  state.partView.setImage(state.annotator.image);
+  state.partView.open(partId, fromRect);
 }
 
 function updateZoomReadout() {
@@ -803,6 +816,17 @@ async function main() {
   $('#suggest-parts').addEventListener('click', suggestParts);
   $('#read-names').addEventListener('click', readNames);
   $('#rename-all').addEventListener('click', () => state.annotator?.autoName());
+
+  $('#inspect-part').addEventListener('click', () => {
+    const annotator = state.annotator;
+    const parts = annotator?.getParts() || [];
+    if (!parts.length) return;
+    // Start on the first part still waiting for a name, since that is what
+    // this is for.
+    const target = parts.find((p) => /^part \d+$/i.test(p.name.trim())) || parts[0];
+    annotator.select(target.id);
+    openPartView(target.id, null);
+  });
 
   $('#clear-parts').addEventListener('click', async () => {
     if (!state.annotator?.count) return;

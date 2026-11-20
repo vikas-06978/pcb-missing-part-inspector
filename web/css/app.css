@@ -115,10 +115,17 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
-html, body { height: 100%; }
+/* An application shell, not a scrolling document.
+   The editor used to sit on a page taller than the window, so a scroll with
+   the pointer over the board panned the board instead of the page, and the
+   board then never re-fitted. Nothing outside the app bar scrolls now; the
+   screens that need it scroll their own content. */
+html, body { height: 100%; overflow: hidden; }
 
 body {
   margin: 0;
+  display: flex;
+  flex-direction: column;
   background: var(--bg);
   color: var(--text);
   font-family: var(--font);
@@ -187,8 +194,7 @@ u { text-decoration-color: var(--brand-line); text-underline-offset: 3px; }
    -------------------------------------------------------------------------- */
 
 .appbar {
-  position: sticky;
-  top: 0;
+  flex: none;
   z-index: 40;
   height: var(--appbar-h);
   display: flex;
@@ -448,31 +454,56 @@ u { text-decoration-color: var(--brand-line); text-underline-offset: 3px; }
 #main {
   position: relative;
   z-index: 1;
-  max-width: 1460px;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: 1600px;
   margin: 0 auto;
-  padding: 30px 22px 72px;
+  padding: 14px 18px 18px;
+  display: flex;
+  flex-direction: column;
 }
 
-.panel { animation: panel-in 0.4s var(--ease-out); }
+.panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  animation: panel-in 0.3s var(--ease-out);
+}
+
+/* These two hold variable-length content, so they scroll inside themselves
+   rather than making the whole window scroll. */
+#step-reference, #step-inspect { overflow-y: auto; overflow-x: hidden; }
+
+.panel__head { flex: none; }
 @keyframes panel-in {
   from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: none; }
 }
 
 .panel__head {
+  flex: none;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
-  gap: 24px;
+  gap: 20px;
   flex-wrap: wrap;
-  margin-bottom: 24px;
+  margin-bottom: 14px;
 }
+.panel__head h2 { font-size: 1.12rem; }
 .panel__head p {
-  margin-top: 6px;
+  margin-top: 4px;
   max-width: 62ch;
   color: var(--text-mid);
-  font-size: 0.92rem;
+  font-size: 0.88rem;
 }
+
+/* The working screens give their vertical space to the board, not to prose.
+   The explanation for these two lives in the first-run tour and the help
+   note, where it is read once rather than occupying the window forever. */
+#step-parts .panel__head p,
+#step-inspect .panel__head p { display: none; }
 
 .card {
   padding: 20px;
@@ -582,14 +613,27 @@ u { text-decoration-color: var(--brand-line); text-underline-offset: 3px; }
    -------------------------------------------------------------------------- */
 
 .editor {
+  flex: 1;
+  min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 316px;
-  gap: 18px;
-  align-items: start;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+  align-items: stretch;
 }
-@media (max-width: 1000px) { .editor { grid-template-columns: 1fr; } }
+/* Too narrow to sit side by side. Stacking inside a fixed shell would
+   squeeze the board to nothing, so this screen scrolls again and the canvas
+   keeps a usable height. */
+@media (max-width: 1000px) {
+  .editor { grid-template-columns: 1fr; }
+  #step-parts { overflow-y: auto; }
+  .canvas-host { height: 52vh; flex: none; }
+  .editor__side { max-height: 60vh; }
+}
 
 .editor__stage {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   background: var(--surface-1);
@@ -597,6 +641,7 @@ u { text-decoration-color: var(--brand-line); text-underline-offset: 3px; }
 }
 
 .stage-toolbar {
+  flex: none;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -734,7 +779,8 @@ u { text-decoration-color: var(--brand-line); text-underline-offset: 3px; }
 
 .canvas-host {
   position: relative;
-  height: min(66vh, 680px);
+  flex: 1;
+  min-height: 260px;
   background:
     linear-gradient(var(--border-soft) 1px, transparent 1px) 0 0 / 28px 28px,
     linear-gradient(90deg, var(--border-soft) 1px, transparent 1px) 0 0 / 28px 28px,
@@ -762,13 +808,14 @@ u { text-decoration-color: var(--brand-line); text-underline-offset: 3px; }
 .editor__side {
   display: flex;
   flex-direction: column;
+  min-height: 0;
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   background: var(--surface-1);
-  max-height: min(calc(66vh + 48px), 728px);
   overflow: hidden;
 }
 .side-head {
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1298,4 +1345,167 @@ dialog::backdrop { background: rgba(3, 6, 11, 0.68); backdrop-filter: blur(5px);
   body { background: #fff; color: #000; }
   .board-card { break-inside: avoid; box-shadow: none; border: 1px solid #999; }
   .results { grid-template-columns: 1fr 1fr; }
+}
+
+
+/* --------------------------------------------------------------------------
+   16. Short windows
+
+   Below this the fixed shell cannot hold a usable canvas, so scrolling comes
+   back rather than squeezing the board into nothing.
+   -------------------------------------------------------------------------- */
+
+@media (max-height: 620px) {
+  html, body { overflow: auto; height: auto; }
+  #main { display: block; }
+  .panel { display: block; }
+  .canvas-host { height: 420px; }
+}
+
+
+/* --------------------------------------------------------------------------
+   17. Part inspector
+
+   The top face carries the real photographed pixels. The four sides are plain
+   neutral material with no detail on them, deliberately: one overhead photo
+   contains no information about what the sides of a component look like, and
+   drawing something there would be the tool inventing evidence.
+   -------------------------------------------------------------------------- */
+
+.partview {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s var(--ease);
+}
+.partview.is-open { opacity: 1; pointer-events: auto; }
+
+.partview__scene {
+  display: flex;
+  align-items: center;
+  gap: 48px;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 24px;
+  perspective: 1400px;
+  perspective-origin: 50% 45%;
+  touch-action: none;
+  cursor: grab;
+}
+.partview__scene.is-turning { cursor: grabbing; }
+
+.partview__slab {
+  position: relative;
+  width: var(--slab-w, 320px);
+  height: var(--slab-h, 320px);
+  transform-style: preserve-3d;
+  transition: transform 0.42s cubic-bezier(.16, 1, .3, 1);
+  will-change: transform;
+}
+
+.slab__face {
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.35) inset;
+}
+.slab__face canvas { display: block; width: 100%; height: 100%; }
+
+/* Thickness. A plain extrusion, no texture: see the note above. */
+.slab__side {
+  position: absolute;
+  background: linear-gradient(var(--slab-edge-a), var(--slab-edge-b));
+}
+:root[data-theme="light"] { --slab-edge-a: #b9bfc8; --slab-edge-b: #8b9199; }
+:root[data-theme="dark"]  { --slab-edge-a: #3a4049; --slab-edge-b: #22262c; }
+
+.slab__side--left,
+.slab__side--right { top: 0; width: 18px; height: 100%; }
+.slab__side--left  { left: 0;  transform: rotateY(-90deg); transform-origin: left center; }
+.slab__side--right { right: 0; transform: rotateY(90deg);  transform-origin: right center; }
+.slab__side--top,
+.slab__side--bottom { left: 0; width: 100%; height: 18px; }
+.slab__side--top    { top: 0;    transform: rotateX(90deg);  transform-origin: center top; }
+.slab__side--bottom { bottom: 0; transform: rotateX(-90deg); transform-origin: center bottom; }
+
+.slab__shadow {
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  bottom: -46px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.3);
+  filter: blur(18px);
+  transform: translateZ(-70px);
+}
+
+.partview__card {
+  width: min(330px, 92vw);
+  padding: 18px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface-up);
+  box-shadow: var(--shadow-3);
+  cursor: auto;
+}
+.partview__row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.partview__state {
+  font-size: 0.7rem;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ok);
+}
+.partview__state.is-unnamed { color: var(--review); }
+.partview__index { font-size: 0.74rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+
+.partview__name {
+  width: 100%;
+  margin: 12px 0 14px;
+  padding: 11px 13px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-str);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 1.12rem;
+  font-weight: 620;
+  font-family: var(--mono);
+  letter-spacing: 0.02em;
+}
+.partview__name:focus { outline: none; border-color: var(--brand); background: var(--surface-1); }
+
+.partview__meta { display: grid; gap: 7px; margin: 0 0 15px; }
+.partview__meta > div { display: flex; justify-content: space-between; gap: 12px; }
+.partview__meta dt { color: var(--text-dim); font-size: 0.78rem; }
+.partview__meta dd {
+  margin: 0;
+  font-size: 0.78rem;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-mid);
+}
+
+.partview__actions { display: flex; flex-wrap: wrap; gap: 7px; }
+.partview__actions .btn--primary { flex: 1; justify-content: center; }
+
+.partview__hint {
+  margin-top: 13px;
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  line-height: 1.6;
+}
+
+.partview__close { position: fixed; top: 16px; right: 18px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .partview__slab { transition: none; }
 }
