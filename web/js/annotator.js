@@ -41,6 +41,9 @@ const SNAP_SCREEN_PX = 6;    // snapping tolerance, in screen px so it feels
 const MARQUEE_MIN = 4;       // screen px before a click becomes a drag
 
 let nextLocalId = 1;
+/** A name the app generated, as opposed to one a person chose. */
+const isPlaceholder = (name) => /^part\s*\d+$/i.test(String(name).trim());
+
 const makeId = () => `n${(nextLocalId++).toString(36)}${Date.now().toString(36).slice(-4)}`;
 
 const CURSORS = {
@@ -154,20 +157,51 @@ export class Annotator {
     }
   }
 
+  /** Top to bottom, then left to right: the order a person reads a board. */
+  static _readingOrder(a, b) {
+    const rowA = Math.round(a.bbox[1] / 40);
+    const rowB = Math.round(b.bbox[1] / 40);
+    return rowA === rowB ? a.bbox[0] - b.bbox[0] : rowA - rowB;
+  }
+
+  /**
+   * Put the list in reading order and renumber the unnamed parts.
+   *
+   * Anything the operator has actually named keeps its name; only the
+   * "Part 7" placeholders are touched.
+   */
+  orderAndNumber(prefix = 'Part') {
+    const ordered = [...this.parts].sort(Annotator._readingOrder);
+    let n = 0;
+    for (const part of ordered) {
+      if (isPlaceholder(part.name)) {
+        n += 1;
+        part.name = `${prefix} ${n}`;
+      }
+    }
+    this.parts = ordered;
+  }
+
   addParts(boxes, namePrefix = 'Part') {
     this._snapshot();
-    let index = this.parts.length;
     const added = [];
     for (const bbox of boxes) {
-      index += 1;
       const part = {
         id: makeId(),
-        name: `${namePrefix} ${index}`,
+        name: `${namePrefix} 0`,
         bbox: this._clampBox(bbox.map(Math.round)),
       };
       this.parts.push(part);
       added.push(part.id);
     }
+
+    // The detector returns boxes largest first, and numbering them in that
+    // order gives a list whose numbers jump around the board at random. Worse,
+    // adding to an existing list continued from the previous count, so the
+    // numbers only came right after pressing Renumber. Ordering here means
+    // auto-detect produces a sensible sequence on its own, which is what
+    // anyone would expect of it.
+    this.orderAndNumber(namePrefix);
     // Deliberately leave nothing selected. Auto-detect can add forty boxes at
     // once; if they all arrived selected, one arrow key would move the whole
     // board's annotation, and the canvas would be a wall of highlight before
@@ -233,16 +267,11 @@ export class Annotator {
     this.requestDraw();
   }
 
+  /** Renumber everything, including parts the operator has named. */
   autoName(prefix = 'Part') {
     if (!this.parts.length) return;
     this._snapshot();
-    // Reading order: top to bottom, then left to right, so the numbering
-    // matches how someone scans the board rather than when boxes were drawn.
-    const ordered = [...this.parts].sort((a, b) => {
-      const rowA = Math.round(a.bbox[1] / 40);
-      const rowB = Math.round(b.bbox[1] / 40);
-      return rowA === rowB ? a.bbox[0] - b.bbox[0] : rowA - rowB;
-    });
+    const ordered = [...this.parts].sort(Annotator._readingOrder);
     ordered.forEach((part, index) => {
       part.name = `${prefix} ${index + 1}`;
     });

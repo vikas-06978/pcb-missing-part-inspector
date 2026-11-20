@@ -556,10 +556,11 @@ async function suggestParts() {
 
     state.annotator.addParts(fresh);
     toast(
-      `${fresh.length} part${fresh.length === 1 ? '' : 's'} added`,
+      `${fresh.length} part${fresh.length === 1 ? '' : 's'} found and numbered`,
       already
-        ? `${already} already had a box and were left alone. Name the new ones and delete any you do not need.`
-        : 'Name the ones you care about and delete the rest.',
+        ? `${already} already had a box and were left alone. These are placeholder numbers: type the real designators next.`
+        : 'These are placeholder numbers in reading order. Type the real '
+          + 'designators next: click a part, type, press Enter for the next one.',
       'success',
     );
   } catch (error) {
