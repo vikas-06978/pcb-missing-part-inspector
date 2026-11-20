@@ -207,26 +207,38 @@ wrong state is a trap rather than a feature.
 
 ### Optional: reading the printed designators
 
-If you have [Ollama](https://ollama.com) running locally with a vision model,
-a **Read labels** button appears on the Parts screen. It reads the designator
-printed beside each component (R12, C3, U7) and fills it in, so you correct
-names instead of typing all of them.
+**This is off by default. Out of the box the app runs no AI model of any
+kind.** You have to switch it on deliberately:
 
 ```bash
-ollama pull llava:7b          # or any vision model
-python run.py                 # the button appears by itself
+ollama pull qwen2.5vl:3b
+PCB_ENABLE_NAMING=1 python run.py     # Windows: set PCB_ENABLE_NAMING=1
 ```
 
-Configure with `PCB_OLLAMA_MODEL` and `PCB_OLLAMA_URL` if your setup differs.
+Then a **Read labels** button appears on the Parts screen. It reads the
+designator printed beside each component (R12, C3, U7) and fills it in, so you
+correct names instead of typing all of them. Configure with
+`PCB_OLLAMA_MODEL` and `PCB_OLLAMA_URL` if your setup differs.
+
+Ollama is local: loopback only, no API key, no cloud, no internet. A
+non-local `PCB_OLLAMA_URL` is rejected rather than dialled, so the offline
+guarantee cannot be lost by misconfiguration. It needs about 4 GB of VRAM for
+the 3B model; larger models spill to system memory and become unusably slow.
 
 **Read this part carefully, because it is the one judgement call in the
-project.** The brief says AI tools "may be used only to create practice data,
-never inside the solution". A local Ollama is offline, so it does not break
-the no-network rule, but it is still an AI tool inside the running app. So it
-is fenced in deliberately:
+project.** The brief says: "No online APIs or hosted services ... AI tools
+like Gemini may be used only to create practice data, never inside the
+solution."
 
-- **Off unless you ask.** No Ollama, no button; nothing is slower and nothing
-  fails. Naming by hand is the normal route.
+A local Ollama satisfies the first sentence completely. The second is open to
+reading, and the strongest argument against a narrow reading is that a narrow
+one makes it redundant: if it only meant hosted AI, the sentence before it
+already said so. So the default here is the conservative reading, and the
+feature is fenced in deliberately:
+
+- **Off unless switched on.** Without `PCB_ENABLE_NAMING=1` no model is
+  contacted, no button appears, and nothing is slower. Naming by hand is the
+  normal route.
 - **It only ever suggests a name.** It has no part whatsoever in deciding
   whether a component is present or missing. That stays entirely in
   `app/vision`: classical, deterministic, explainable.
