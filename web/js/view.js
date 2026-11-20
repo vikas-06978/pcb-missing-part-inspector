@@ -102,6 +102,13 @@ export class CanvasView {
     const rect = this.host.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
 
+    // What the operator is looking at, in board coordinates, before the
+    // panel changes size. Restored afterwards so the view follows the
+    // resize instead of staying where it was in screen coordinates.
+    const hadSize = this.width > 0 && this.height > 0;
+    const focusX = hadSize ? (this.width / 2 - this.tx) / this.scale : 0;
+    const focusY = hadSize ? (this.height / 2 - this.ty) / this.scale : 0;
+
     const ratio = window.devicePixelRatio || 1;
     this.width = rect.width;
     this.height = rect.height;
@@ -117,8 +124,34 @@ export class CanvasView {
     // view as the panel resizes. Without this, anything that changes the
     // layout after the first fit -- a help note appearing, the window being
     // resized -- silently leaves the board cropped.
-    if (!this.userMoved && this.contentWidth) this.fit();
-    else this.onChange();
+    if (!this.userMoved && this.contentWidth) {
+      this.fit();
+      return;
+    }
+
+    // Somebody who has zoomed in deliberately should not have the view
+    // yanked back out from under them, so their scale is kept. But keeping
+    // the screen-space offset as well meant that shrinking the panel could
+    // carry the whole board out of sight, and a blank canvas is a worse
+    // outcome than a moved one: the board simply vanished, with the zoom
+    // readout still claiming a sensible number. The point they were looking
+    // at is put back in the middle, and then the pan is clamped so some of
+    // the board is always on screen whatever the new size is.
+    if (hadSize && this.contentWidth) {
+      this.tx = this.width / 2 - focusX * this.scale;
+      this.ty = this.height / 2 - focusY * this.scale;
+      this._clampPan();
+    }
+    this.onChange();
+  }
+
+  /** Keep at least a corner of the board inside the viewport. */
+  _clampPan(margin = 48) {
+    if (!this.contentWidth || !this.contentHeight) return;
+    const w = this.contentWidth * this.scale;
+    const h = this.contentHeight * this.scale;
+    this.tx = Math.min(this.width - margin, Math.max(margin - w, this.tx));
+    this.ty = Math.min(this.height - margin, Math.max(margin - h, this.ty));
   }
 
   setContent(width, height) {

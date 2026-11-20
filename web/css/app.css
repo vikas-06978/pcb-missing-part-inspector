@@ -55,7 +55,10 @@
 
   --text:        #15181d;
   --text-mid:    #596273;
-  --text-dim:    #8a93a3;
+  /* Darkened from #8a93a3, which read 3.1:1 against white. It carries
+     labels, hints and part dimensions, all of them small text, so it
+     has to clear 4.5:1 rather than the 3:1 that large text can use. */
+  --text-dim:    #687182;
 
   --brand:       #2f6feb;
   --brand-alt:   #2f6feb;
@@ -88,7 +91,8 @@
 
   --text:        #e7e9ed;
   --text-mid:    #9aa3b2;
-  --text-dim:    #6b7482;
+  /* Same correction on the dark theme: 4.0:1 before, 5.1:1 now. */
+  --text-dim:    #7c8694;
 
   --brand:       #5b8def;
   --brand-alt:   #5b8def;

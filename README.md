@@ -672,3 +672,10 @@ Stated here rather than discovered by whoever tries it:
   optional label reader, and they are the chips. [Why](#why-the-last-nine-cannot-be-read).
 - **It has not been run on a real board**, because there was not one to
   photograph. Everything above is honest about that.
+- **The Parts screen is not usable on a phone.** The layout reflows down to
+  375 px without breaking or scrolling sideways, and the Inspect screen is
+  fine there, but drawing a box around an 0402 on a board rendered a few
+  hundred pixels wide is not a thing anyone can do, and the on-screen hints
+  still talk about scroll wheels. Naming wants a laptop. What a phone would
+  need is a touch-first canvas with pinch zoom and a magnifier, which is a
+  piece of work, not a media query.
