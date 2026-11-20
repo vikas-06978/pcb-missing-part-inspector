@@ -23,7 +23,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
-from app import storage
+from app import naming, storage
 from app.config import (
     ALLOWED_UPLOAD_TYPES,
     APP_NAME,
@@ -263,6 +263,44 @@ def suggest() -> dict[str, Any]:
         "count": len(suggestions),
         "elapsed_ms": round((time.perf_counter() - started) * 1000, 1),
     }
+
+
+@app.get("/api/naming/status")
+def naming_status() -> dict[str, Any]:
+    """Is the optional local naming assistant usable right now?
+
+    Called once when the Parts screen opens. If this says no, the button is
+    simply not shown and naming happens by hand, which is the normal route.
+    """
+    return naming.status().to_dict()
+
+
+class NameRequest(BaseModel):
+    part_id: str
+
+
+@app.post("/api/project/suggest-name")
+def suggest_part_name(payload: NameRequest) -> dict[str, Any]:
+    """Suggest a designator for one part, so the UI can show progress.
+
+    One part per request on purpose: forty parts through a vision model takes
+    a while, and an operator watching a frozen screen for a minute will assume
+    it has crashed. This way the UI fills names in as they arrive and can be
+    stopped at any point.
+    """
+    project = _require_project()
+    reference = _require_reference(project)
+
+    part = next((p for p in project.parts if p.id == payload.part_id), None)
+    if part is None:
+        raise HTTPException(status_code=404, detail="Part not found.")
+
+    state = naming.status()
+    if not state.available:
+        raise _bad_request(state.reason)
+
+    name, note = naming.suggest_name(reference, part.bbox, state.model)
+    return {"part_id": part.id, "name": name, "note": note}
 
 
 @app.get("/api/project/export")

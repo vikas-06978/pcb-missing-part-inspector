@@ -2,7 +2,7 @@
 
 ![Architecture diagram](docs/architecture.png)
 
-**[Open the interactive diagram →](docs/architecture.html)** — a standalone
+**[Open the interactive diagram →](docs/architecture.html)**, a standalone
 file with light/dark themes, route highlighting and source links back to the
 exact lines in this repository. Download and open it in a browser; it needs no
 server and no network.
@@ -36,7 +36,7 @@ provenance **check**, and a real-browser **browser-check**.
 The first run failed on purpose-built grounds and is worth recording: a
 1360 px canvas pushed the 8 px edge labels below the desktop readability floor.
 The fix was to compact the column pitch to 1150 px rather than to shrink the
-content — the same "fix the cause, not the threshold" move as Decision 5 in
+content, the same "fix the cause, not the threshold" move as Decision 5 in
 [`AI_COLLAB.md`](AI_COLLAB.md).
 
 The 203-file Archify package itself is installed locally and git-ignored; it is
@@ -98,7 +98,7 @@ JSON verdicts
 
 The cost is that it *looks* like a web app, which could invite doubt about the
 offline requirement. That is answered concretely: it binds to `127.0.0.1`, and
-the page loads no CDN script, no web font and no external stylesheet — every
+the page loads no CDN script, no web font and no external stylesheet, every
 byte is served from `web/`.
 
 ## 4. Why files instead of a database
@@ -112,7 +112,7 @@ truncate a project.
 
 **Given up:** no query across boards, no multi-user access, no retention policy.
 All of those become real at plant scale, and all of them are a migration, not a
-redesign — `storage.py` is the only module that touches the disk.
+redesign: `storage.py` is the only module that touches the disk.
 
 ## 5. Why six signals and a fixed fusion
 
@@ -124,13 +124,13 @@ discriminating power on the benchmark.
 
 **Given up:** a learned combiner (logistic regression, gradient boosting) would
 almost certainly fit better. It needs labelled data from the deployment, which
-does not exist at setup time — the whole premise is a board nobody has seen.
+does not exist at setup time, the whole premise is a board nobody has seen.
 Fixed weights are auditable, live in one file, and behave predictably on
 hardware the author never saw.
 
 **Given up:** the vetoes and the capped scene compensation are heuristics, not
-probability. They encode a real asymmetry — a tool that cries wolf gets ignored,
-and an ignored tool catches nothing — but they are the first thing I would
+probability. They encode a real asymmetry, a tool that cries wolf gets ignored,
+and an ignored tool catches nothing, but they are the first thing I would
 revisit with field data.
 
 ## 6. Other trade-offs worth naming
@@ -138,7 +138,7 @@ revisit with field data.
 | Chose | Gave up |
 |---|---|
 | Working resolution capped at 1800 px long edge | Detail on very large images. Keeps a board under a second and keeps SIFT honest; components below ~10 px were never going to be decidable anyway |
-| Replacing the reference discards its parts and runs | Convenience. Keeping boxes against a new photo silently misaligns every ROI, which produces confident nonsense — the worst possible failure |
+| Replacing the reference discards its parts and runs | Convenience. Keeping boxes against a new photo silently misaligns every ROI, which produces confident nonsense, the worst possible failure |
 | Rendered benchmark instead of photographs | External validity. Bought exact ground truth, a controllable nuisance model, and a benchmark that ships in the repo. Stated plainly in `README.md` and `RESEARCH.md §4` |
 | Autosave of named parts | An explicit save step some users expect. Losing forty boxes to a closed tab is not recoverable; a surprising save is |
 | Whole batch returned in one response | True streaming progress. Three to twelve boards at ~0.7 s each does not justify websockets; the progress bar is paced to the measured rate and never claims completion early |
@@ -152,7 +152,7 @@ So it can be checked against the code rather than taken on trust:
 - `web/` talks **only** to `app/main.py` over HTTP on `127.0.0.1`; it has no
   other network target.
 - `app/main.py` is the **only** module that imports FastAPI.
-- `app/vision/*` imports **only** `cv2`, `numpy` and `app.config` — never
+- `app/vision/*` imports **only** `cv2`, `numpy` and `app.config`, never
   `app.storage`, `app.main` or `fastapi`.
 - The four engine stages run in the order shown, once per test photograph.
 - Everything written to disk lands under `data/`.

@@ -547,7 +547,7 @@ export async function buildReport(results, projectName) {
 
     sections.push(`
       <section>
-        <h2 class="s-${status}">${escapeHtml(result.filename)} — ${escapeHtml(headline)}</h2>
+        <h2 class="s-${status}">${escapeHtml(result.filename)}: ${escapeHtml(headline)}</h2>
         <p class="meta">
           Inspected ${new Date(result.created_at * 1000).toLocaleString()} ·
           sensitivity ${escapeHtml(result.sensitivity)} ·
@@ -564,7 +564,7 @@ export async function buildReport(results, projectName) {
 
   const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
-<title>Inspection report — ${escapeHtml(projectName)}</title>
+<title>Inspection report: ${escapeHtml(projectName)}</title>
 <style>
   body{font:15px/1.6 -apple-system,"Segoe UI",Roboto,sans-serif;margin:0;padding:40px;
        background:#f6f8fb;color:#101722;max-width:980px;margin-inline:auto}

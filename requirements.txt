@@ -1,4 +1,4 @@
-# PCB Missing-Component Inspector — runtime dependencies.
+# PCB Missing-Component Inspector: runtime dependencies.
 # Everything here runs locally. The application makes no network calls at runtime.
 
 fastapi>=0.110,<1.0

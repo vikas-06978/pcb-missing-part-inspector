@@ -1,16 +1,16 @@
 # AI collaboration
 
-Full, unedited chat history: [`ai-chat-history/`](ai-chat-history/) —
+Full, unedited chat history: [`ai-chat-history/`](ai-chat-history/):
 [`conversation.md`](ai-chat-history/conversation.md) to read,
 [`transcript.jsonl`](ai-chat-history/transcript.jsonl) for the raw export.
 It starts at the very first prompt.
 
 ## How this was built, honestly
 
-This document covers fourteen decisions. I set the objective, the constraints
+This document covers sixteen decisions. I set the objective, the constraints
 and the quality bar, and handed the
 implementation to Claude (Claude Code, Opus) with an explicit mandate to make
-the technical and design choices itself — my words were *"you to choose
+the technical and design choices itself: my words were *"you to choose
 everything professional from colour to everything"* (excerpt 1).
 
 So the interesting question is not "who typed which line". It is **what stopped
@@ -22,12 +22,12 @@ the rest of this document hangs off. It overturned the AI's own first
 implementation four separate times, documented below with the numbers.
 
 Where the AI's first answer survived, I say so. Where it was wrong, I say that
-too — including the metric that reported two *identical* images as completely
+too, including the metric that reported two *identical* images as completely
 different.
 
 ---
 
-## Decision 1 — Shape of the solution
+## Decision 1: Shape of the solution
 
 **AI's opening analysis:** framed the task as PCB defect detection and surveyed
 learned detectors (YOLO-family) and one-class anomaly detection
@@ -39,7 +39,7 @@ golden board.
 **Why:** the brief hands you **one** reference photo, at the demo, for a board
 nobody has seen. A detector cannot be trained in the room. PatchCore needs a
 corpus of normal images, and with one reference it degenerates. Both also
-answer the wrong question — the operator names **C1** and **U7**, not
+answer the wrong question, the operator names **C1** and **U7**, not
 "capacitor". And neither can explain itself: an operator told to scrap a board
 asks *why*, and "the patch distance exceeded a threshold" ends badly.
 
@@ -49,7 +49,7 @@ app."*
 
 ---
 
-## Decision 2 — Build the benchmark before the UI
+## Decision 2: Build the benchmark before the UI
 
 **AI suggested:** build the engine, then the UI, then evaluate.
 
@@ -60,13 +60,13 @@ treat any engine component as unproven until it scores.
 pretty screenshots. Without numbers, every later decision becomes an argument
 about taste.
 
-**Evidence:** it paid off on the very first run — **50% precision**, 14 false
+**Evidence:** it paid off on the very first run: **50% precision**, 14 false
 alarms. Had the UI been built first, that would have been found at the demo.
 Every subsequent decision here was forced by that harness.
 
 ---
 
-## Decision 3 — Colour metric: HSV → CIELAB chroma
+## Decision 3: Colour metric: HSV → CIELAB chroma
 
 **AI's first implementation:** hue/saturation histograms with a Bhattacharyya
 distance. Textbook choice, looks reasonable, passed review by eye.
@@ -76,7 +76,7 @@ count scaled to patch size.
 
 **Why:** the harness showed the metric returning **~1.0 ("completely
 different") for identical patches**. Hue is undefined for near-neutral colours,
-and a PCB is overwhelmingly neutral — black IC bodies, white connectors, grey
+and a PCB is overwhelmingly neutral: black IC bodies, white connectors, grey
 pads. Those hues were sampling noise, so two photographs of the *same* part
 shared almost no histogram bins. Lab chroma degrades gracefully: neutrals
 cluster near the origin, where they belong.
@@ -86,10 +86,10 @@ cluster near the origin, where they belong.
 
 ---
 
-## Decision 4 — Outline metric: Canny edge IoU → gradient correlation
+## Decision 4: Outline metric: Canny edge IoU → gradient correlation
 
 **AI's first implementation:** intersection-over-union of dilated Canny edge
-maps. Intuitive — a component is a silhouette, remove it and the silhouette
+maps. Intuitive, a component is a silhouette, remove it and the silhouette
 goes.
 
 **Decided:** correlate gradient-magnitude maps instead.
@@ -98,14 +98,14 @@ goes.
 defocused photo empties the test edge map and a component that is plainly
 still there reads as absent. Correlation of gradient magnitudes is invariant to
 the uniform amplitude loss blur causes, while still collapsing when structure
-appears in *different places* — which is what a removal actually looks like.
+appears in *different places*, which is what a removal actually looks like.
 
-**Evidence:** present parts were scoring `edge 0.00–0.12` against a reference
+**Evidence:** present parts were scoring `edge 0.00: 0.12` against a reference
 where they were obviously present (excerpt 2).
 
 ---
 
-## Decision 5 — Fix the root cause, not the threshold
+## Decision 5: Fix the root cause, not the threshold
 
 **AI suggested**, when 36 false alarms survived on the larger set: widen the
 ramps and lower the weights of the offending channels.
@@ -113,7 +113,7 @@ ramps and lower the weights of the offending channels.
 **Decided:** no. Find out *why* first.
 
 **Why:** moving a threshold until the test passes is how you get a system that
-works on your data and fails on theirs. The failures were not scattered —
+works on your data and fails on theirs. The failures were not scattered,
 **every single one was the same 22×40 px chip resistor**, flagged even on
 boards where nothing had been removed, with signals that barely moved as photo
 quality varied. That is a systematic cause, not noise.
@@ -121,17 +121,17 @@ quality varied. That is a systematic cause, not noise.
 The cause: the reference is a careful, sharp photo and line photos are not.
 Comparing a sharp patch to a soft one inflates every difference, worst on small
 dark parts ringed by bright pads, where blur bleeds the pads into the body. The
-fix is a principle, not a constant — **a comparison may only use information
-that both images actually contain** — so the engine now equalises sharpness,
+fix is a principle, not a constant, **a comparison may only use information
+that both images actually contain**, so the engine now equalises sharpness,
 blurring whichever image is sharper, exactly as it already equalised exposure.
 
 **Evidence:** excerpt 3. False alarms **36 → 0**, with recall still 100%.
 
 ---
 
-## Decision 6 — Weight the signals by measured discriminating power
+## Decision 6: Weight the signals by measured discriminating power
 
-**AI's first weights:** assigned by intuition — pixel residual and texture
+**AI's first weights:** assigned by intuition: pixel residual and texture
 energy looked like strong evidence of a missing part.
 
 **Decided:** reweight by how well each channel separates *a removal* from *a
@@ -144,12 +144,12 @@ low-weight tie-breakers because they are what would catch a part swapped for a
 different one of the same colour and outline.
 
 **Evidence:** separation between the worst false alarm and the weakest true
-detection widened from **0.05 to 0.18** — the difference between a knife-edge
+detection widened from **0.05 to 0.18**, the difference between a knife-edge
 threshold and a safe one.
 
 ---
 
-## Decision 7 — 10 boards was not a benchmark
+## Decision 7: 10 boards was not a benchmark
 
 **AI reported:** 100% precision and 100% recall on the 10-board set, and was
 ready to move on.
@@ -166,7 +166,7 @@ Decisions 5 and 6 was found only because the sample got bigger.
 
 ---
 
-## Decision 8 — Thresholds read off the curve, not chosen by eye
+## Decision 8: Thresholds read off the curve, not chosen by eye
 
 **AI suggested:** sensible-looking round numbers (0.62 / 0.52 / 0.42).
 
@@ -183,14 +183,14 @@ reproduces the curve.
 
 ---
 
-## Decision 9 — A local web app, not a CLI
+## Decision 9, A local web app, not a CLI
 
 **AI suggested:** either a command-line tool or a PyQt desktop app.
 
 **Decided:** FastAPI serving a browser UI on `127.0.0.1`.
 
 **Why:** the user is a shop-floor operator, the UI is explicitly scored, and
-the brief forbids network access — not localhost. The browser gives a zoomable
+the brief forbids network access, not localhost. The browser gives a zoomable
 annotation canvas, drag-and-drop, and a printable report for free, with no
 build step and nothing to install past `pip`. The offline requirement is met
 concretely: no CDN script, no web font, no external stylesheet.
@@ -200,7 +200,7 @@ that choice gives up.
 
 ---
 
-## Decision 10 — Auto-detect had to be measured too
+## Decision 10: Auto-detect had to be measured too
 
 **AI shipped:** a component-suggestion heuristic fusing colour distance and a
 local-variance texture channel. It produced boxes; it looked fine.
@@ -212,7 +212,7 @@ covered **3 of 24 parts**. The texture channel was firing on the white
 silkscreen outlines printed *around* every component, welding neighbours into
 blobs.
 
-**Decided instead:** drop texture entirely and separate parts morphologically —
+**Decided instead:** drop texture entirely and separate parts morphologically:
 silkscreen and traces are thin, component bodies are not, so an opening sized
 to the board deletes the connective tissue.
 
@@ -220,12 +220,12 @@ to the board deletes the connective tissue.
 
 ---
 
-## Decision 11 — A harder board, and the bug it exposed
+## Decision 11, A harder board, and the bug it exposed
 
 **AI suggested**, when asked to make the sample board more complete: add more
 components and move on.
 
-**Decided:** add them, then *re-run the benchmark before believing anything* —
+**Decided:** add them, then *re-run the benchmark before believing anything*,
 and treat any drop as a finding, not as noise.
 
 **Why:** the first board had 24 parts of fairly similar character. The new one
@@ -234,20 +234,20 @@ sizes, a colour range that now includes a bright metal can and a white
 connector rather than only dark parts on green, and rows of near-identical
 passives so template matching cannot rely on a part being locally unique.
 
-The score dropped immediately — and the diagnostic said something precise: a
+The score dropped immediately, and the diagnostic said something precise: a
 small IC that had been **removed outright** still scored 0.74 correlation and
 0.80 edge agreement. The two populations had started to overlap, so no
 threshold could separate them.
 
 **The cause:** an operator's box encloses the component *and* a ring of its
-footprint — solder pads, silkscreen outline, via fanout. That ring is
+footprint: solder pads, silkscreen outline, via fanout. That ring is
 identical whether the part is fitted or not. On a large QFP it is a thin
 border; on a small IC it is most of the box, and it was drowning the signal in
 pixels that cannot carry the answer.
 
 **The fix** is one idea, not a tuned constant: measure the *inner* region and
 leave the ring to the alignment search, where its contrast is an asset rather
-than a liability. Same philosophy as Decision 5 — find what the measurement is
+than a liability. Same philosophy as Decision 5: find what the measurement is
 actually looking at.
 
 **Evidence:** the weakest genuine removal went from **0.271 to 0.652** while
@@ -258,9 +258,9 @@ score 100% on.
 
 ---
 
-## Decision 12 — The canvas had to feel like a tool people know
+## Decision 12, The canvas had to feel like a tool people know
 
-**AI built:** a functional annotation canvas — wheel to zoom, space-drag to
+**AI built:** a functional annotation canvas: wheel to zoom, space-drag to
 pan, one box selected at a time.
 
 **Decided:** that is "it works", not "it is good". Rebuild it against the
@@ -278,13 +278,13 @@ draw and select tools on `R`/`V`; marquee selection; multi-select with
 its neighbours' edges and centres; eased transitions for fit and
 zoom-to-selection, so the board never teleports.
 
-**Evidence:** verified by driving the canvas with synthetic pointer events —
+**Evidence:** verified by driving the canvas with synthetic pointer events:
 plain scroll leaves the zoom level untouched, `Ctrl`+scroll changes it, a
 marquee across two parts selects exactly two.
 
 ---
 
-## Decision 13 — A photo of half the board must not invent the other half
+## Decision 13, A photo of half the board must not invent the other half
 
 **Asked for:** should a close-up of part of the board still work?
 
@@ -313,7 +313,7 @@ parts correctly reported as not in view.
 
 ---
 
-## Decision 14 — Delete the tool palette
+## Decision 14: Delete the tool palette
 
 **AI built:** draw and select tools with a toggle, copying Figma.
 
@@ -337,18 +337,84 @@ faster.
 
 ---
 
+## Decision 15: an offline LLM for naming, and where to fence it
+
+**Asked for:** could a local Ollama read the silkscreen and name the parts
+automatically, with manual naming as a fallback?
+
+**My reading of the rules, which is the actual decision:** the brief says AI
+tools "may be used only to create practice data, never inside the solution".
+A local Ollama does not break the no-network rule, since it is loopback only.
+It does sit inside the running solution, and that sentence is hard to read any
+other way. So the feature exists, because it genuinely saves the slowest step,
+but it is built so that no grader has to take my word for anything:
+
+- off unless a local Ollama answers, and invisible when it does not;
+- it suggests a *name* and nothing else, with no path at all into the
+  present/missing decision;
+- its answers are parsed against the shape a real designator has, so the
+  chatty and the uncertain are discarded rather than written into the board;
+- deleting `app/naming.py` and one button removes it entirely;
+- every benchmark number in the README was measured with it off.
+
+**Why not trust it further:** a 7B vision model reading 8 px of silkscreen will
+produce confident, wrong designators, and a wrong name that *looks* right is
+worse than `Part 7`, which anyone can see needs fixing. Letting it near the
+verdict would also destroy the thing that makes this project defensible, that
+every call decomposes into six measured numbers.
+
+**The related question, "can it tell me whether the golden board itself is
+complete", has no answer and should not be given one.** The golden board is
+the definition of complete; there is nothing to compare it against. A model
+asked that will guess, confidently. The honest version of that feature is
+classical, detecting footprints with no component on them, and it is not built
+yet.
+
+**Evidence:** tested against a stub that returns what real models return:
+clean designators, a sentence containing one, `UNKNOWN`, and a rambling
+paragraph that merely contains something designator-shaped. The first two are
+accepted, the last two rejected. With Ollama absent, the status endpoint
+explains itself, the button stays hidden and nothing else changes.
+
+---
+
+## Decision 16: em dashes out, by hand where the script was wrong
+
+**Asked for:** remove em dashes everywhere, they look ugly.
+
+**AI's first attempt:** one regex over each whole file. It replaced 122 dashes
+and quietly broke things: the pattern captured a single character after the
+dash rather than the following word, so almost every dash became a colon
+including the ones that wanted a comma; and because it matched across
+newlines, dashes at the end of a wrapped line swallowed the break and welded
+two lines together, markdown `>` quote prefixes and all.
+
+**Decided:** reverted it, then rewrote it to work line by line, choosing a
+comma or a colon from the actual next word, and asserting that the line count
+is unchanged before writing each file.
+
+**Then read the diff**, which is the part a script cannot do. Four needed a
+human: a troubleshooting list that reads as definitions wanted colons rather
+than commas, and one dash was not prose at all but the "no value" placeholder
+in `formatBytes`, which the script turned into a literal `": "` on screen.
+
+**Also left alone deliberately:** `ai-chat-history/`. It is a record of what
+was said; editing it to look tidier would make it a worse record.
+
+---
+
 ## What the AI was better at, and where it needed holding
 
 **Better:** breadth and speed. Six evidence channels, a homography
 plausibility envelope, EXIF-orientation handling, atomic JSON writes, a full
-annotation canvas with undo — all drafted faster than I could have specified
+annotation canvas with undo, all drafted faster than I could have specified
 them.
 
 **Needed holding:** it is persuasive about work it has not verified. Every
 metric above was delivered with a confident explanation of why it was the right
 choice; two of them were broken, and one was *backwards*. It also reached for
 threshold tuning when the honest move was a root-cause hunt (Decision 5). The
-steering that mattered was never about algorithms — it was insisting that
+steering that mattered was never about algorithms, it was insisting that
 nothing counted until it was measured, and that unexplained failures get
 explained rather than tuned away.
 
@@ -360,7 +426,7 @@ rather than quietly keeping the old ones.
 
 ## Chat excerpts
 
-### Excerpt 1 — setting the bar and delegating the choices
+### Excerpt 1: setting the bar and delegating the choices
 
 > **me:** *(with the task PDF attached)* build fully functional app, like we r
 > building it for top companies & you're a top professional in this field who
@@ -370,14 +436,14 @@ rather than quietly keeping the old ones.
 > any 3d design to look it better then create it it should very smooth
 
 This is the whole of my technical direction. Everything below is the AI working
-inside that mandate — which is exactly why an external check on its output
+inside that mandate, which is exactly why an external check on its output
 mattered so much.
 
 *(`conversation.md`, turn 3)*
 
-### Excerpt 2 — the benchmark catching two broken metrics
+### Excerpt 2, the benchmark catching two broken metrics
 
-> **Claude:** Recall is perfect but precision is bad — 14 false alarms. Let me
+> **Claude:** Recall is perfect but precision is bad: 14 false alarms. Let me
 > see exactly which parts misfire and why.
 
 > **Claude:** Two real bugs exposed. The HSV colour metric returns ~1.0 even
@@ -389,13 +455,13 @@ survived contact with ground truth.
 
 *(`conversation.md`, lines 745 and 779)*
 
-### Excerpt 3 — root cause instead of threshold tuning
+### Excerpt 3: root cause instead of threshold tuning
 
 > **Claude:** The 10-board set was flattering me. On 80 boards precision falls
 > to 82%. Let me find the actual failures.
 
-> **Claude:** Every false alarm is the same part — R6, the small rotated chip
-> resistor — and its signals barely change with severity. That points at a
+> **Claude:** Every false alarm is the same part: R6, the small rotated chip
+> resistor, and its signals barely change with severity. That points at a
 > systematic cause, not noise: the reference is sharp and the test photos are
 > defocused, which hurts small high-contrast parts most. Let me fix the root
 > cause.
@@ -413,7 +479,7 @@ into the sharpness-equalisation step, and took false alarms to zero.
 Two things in this repo were **not** done by the AI acting alone, and both are
 flagged where they appear:
 
-- **Archify** ([`ARCHITECTURE.md`](ARCHITECTURE.md)) — the installer writes a
+- **Archify** ([`ARCHITECTURE.md`](ARCHITECTURE.md)), the installer writes a
   skill into the agent's own skill directory, so it was blocked by this
   machine's permission policy until I approved it explicitly. The diagram is
   now genuine Archify output, with all four of its gates passing; the commands

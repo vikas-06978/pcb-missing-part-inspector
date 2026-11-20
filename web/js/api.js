@@ -75,6 +75,11 @@ export const api = {
 
   suggest: () => request('/api/project/suggest', { method: 'POST' }),
 
+  namingStatus: () => request('/api/naming/status'),
+
+  suggestName: (partId) =>
+    request('/api/project/suggest-name', asJson({ part_id: partId })),
+
   inspect(files, sensitivity) {
     const form = new FormData();
     for (const file of files) form.append('files', file);

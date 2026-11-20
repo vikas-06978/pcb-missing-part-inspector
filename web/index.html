@@ -113,7 +113,7 @@
         <ul class="guide-list">
           <li><b>Fill the frame</b> with the board, square to the camera.</li>
           <li><b>Even light</b>, no hard shadow across components.</li>
-          <li><b>In focus</b> — small passives must be sharp.</li>
+          <li><b>In focus</b>: small passives must be sharp.</li>
           <li><b>Same viewpoint</b> for every photo you inspect later.</li>
         </ul>
         <p class="note">Nothing leaves this machine. Photos are processed locally
@@ -128,8 +128,8 @@
       <div class="preview-meta">
         <h3>Reference loaded</h3>
         <dl class="meta-list">
-          <div><dt>File</dt><dd id="reference-filename">&mdash;</dd></div>
-          <div><dt>Size</dt><dd id="reference-size">&mdash;</dd></div>
+          <div><dt>File</dt><dd id="reference-filename">-</dd></div>
+          <div><dt>Size</dt><dd id="reference-size">-</dd></div>
           <div><dt>Named parts</dt><dd id="reference-parts">0</dd></div>
         </dl>
         <div class="row">
@@ -153,7 +153,7 @@
           <svg viewBox="0 0 24 24" class="btn__icon" aria-hidden="true"><path d="m12 3 2.1 5.2L19.5 10l-5.4 1.8L12 17l-2.1-5.2L4.5 10l5.4-1.8Z"/><path d="M18.5 15.5 19.4 18l2.5.9-2.5.9-.9 2.5-.9-2.5-2.5-.9 2.5-.9Z"/></svg>
           Auto-detect
         </button>
-        <button class="btn btn--primary" id="to-inspect" type="button">Done — start inspecting</button>
+        <button class="btn btn--primary" id="to-inspect" type="button">Start inspecting</button>
       </div>
     </header>
 
@@ -194,7 +194,14 @@
       <aside class="editor__side">
         <div class="side-head">
           <h3>Parts <span class="count-pill" id="parts-count">0</span></h3>
+          <div class="row">
+          <button class="btn btn--ghost btn--sm is-hidden" id="read-names" type="button"
+                  title="Read the printed designators with a local Ollama model">
+            <svg viewBox="0 0 24 24" class="btn__icon" aria-hidden="true"><path d="M3.5 12s3.4-6 8.5-6 8.5 6 8.5 6-3.4 6-8.5 6-8.5-6-8.5-6Z"/><circle cx="12" cy="12" r="2.4"/></svg>
+            Read labels
+          </button>
           <button class="btn btn--ghost btn--sm" id="rename-all" type="button" title="Give every part a sequential name">Auto-name</button>
+        </div>
         </div>
         <ul class="part-list" id="part-list"></ul>
         <div class="side-empty" id="parts-empty">

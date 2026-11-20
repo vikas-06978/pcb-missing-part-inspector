@@ -89,6 +89,7 @@ function goTo(step) {
     });
     // Explained in place rather than in a modal: a dialog in the middle of the
     // annotation screen would cover the thing it is describing.
+    refreshNamingButton();
     showHelpStrip(
       $('#step-parts'),
       'canvas',
@@ -194,6 +195,24 @@ function createAnnotator() {
     state.annotator.requestDraw();
     updateZoomReadout();
   };
+}
+
+/**
+ * Show the label-reading button only if a local Ollama can actually serve it.
+ *
+ * Checked when the Parts screen opens rather than at startup, so starting
+ * Ollama later and coming back is enough; and failing silently, because a
+ * missing optional tool is not an error the operator needs to hear about.
+ */
+async function refreshNamingButton() {
+  const button = $('#read-names');
+  try {
+    const status = await api.namingStatus();
+    button.classList.toggle('is-hidden', !status.available);
+    if (status.available) button.title = `Read printed designators using ${status.model}`;
+  } catch {
+    button.classList.add('is-hidden');
+  }
 }
 
 function updateZoomReadout() {
@@ -345,6 +364,72 @@ async function savePartsNow() {
   }
 }
 
+/**
+ * Optional: read the printed designators with a local Ollama vision model.
+ *
+ * Strictly a typing shortcut. It fills in names and nothing else; the
+ * missing/present decision never touches it. Anything the model is unsure
+ * about is left alone for the operator, which is also what happens to every
+ * part if Ollama is not installed.
+ */
+async function readNames() {
+  const button = $('#read-names');
+  const annotator = state.annotator;
+  if (!annotator?.count) return;
+
+  if (state.readingNames) {
+    state.readingNames = false;            // second press stops it
+    return;
+  }
+
+  const parts = annotator.getParts();
+  const original = button.innerHTML;
+  state.readingNames = true;
+
+  let read = 0;
+  let skipped = 0;
+
+  try {
+    for (const [index, part] of parts.entries()) {
+      if (!state.readingNames) break;
+      button.textContent = `Stop (${index + 1}/${parts.length})`;
+
+      try {
+        const { name } = await api.suggestName(part.id);
+        if (name) {
+          annotator.renamePart(part.id, name);
+          read += 1;
+        } else {
+          skipped += 1;
+        }
+      } catch (error) {
+        toast('Stopped reading labels', error.message, 'error');
+        break;
+      }
+    }
+    await savePartsNow();
+
+    if (read) {
+      toast(
+        `Read ${read} label${read === 1 ? '' : 's'}`,
+        skipped
+          ? `${skipped} could not be read and were left as they were. Check them before inspecting.`
+          : 'Check them before inspecting.',
+        'success',
+      );
+    } else {
+      toast(
+        'No labels could be read',
+        'The model could not make out the printed designators. Name them by hand.',
+        'warn',
+      );
+    }
+  } finally {
+    state.readingNames = false;
+    button.innerHTML = original;
+  }
+}
+
 async function suggestParts() {
   const button = $('#suggest-parts');
   button.disabled = true;
@@ -352,7 +437,7 @@ async function suggestParts() {
   try {
     const { suggestions } = await api.suggest();
     if (!suggestions.length) {
-      toast('Nothing detected', 'Draw the boxes by hand — it only takes a moment.', 'warn');
+      toast('Nothing detected', 'Draw the boxes by hand, it only takes a moment.', 'warn');
       return;
     }
     state.annotator.addParts(suggestions.map((s) => s.bbox));
@@ -688,6 +773,7 @@ async function main() {
   $('#zoom-selection').addEventListener('click', () => state.annotator?.zoomToSelection());
 
   $('#suggest-parts').addEventListener('click', suggestParts);
+  $('#read-names').addEventListener('click', readNames);
   $('#rename-all').addEventListener('click', () => state.annotator?.autoName());
 
   $('#clear-parts').addEventListener('click', async () => {

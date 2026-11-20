@@ -25,7 +25,7 @@ export const WELCOME_STEPS = [
     target: '#reference-drop, #reference-preview',
     title: 'Start with a board you trust',
     body: 'Drop in a photo of a complete board. Everything is compared against '
-        + 'this one, so take it the way your line camera sees the board — square '
+        + 'this one, so take it the way your line camera sees the board: square '
         + 'on, evenly lit, in focus.',
     placement: 'top',
   },

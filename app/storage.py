@@ -117,14 +117,32 @@ class Project:
 # --------------------------------------------------------------------------
 
 
-def _write_json(path: Path, payload: dict[str, Any]) -> None:
-    """Write via a temp file + replace so a crash cannot truncate a project."""
+def _write_json(path: Path, payload: dict[str, Any], attempts: int = 5) -> None:
+    """Write via a temp file + replace so a crash cannot truncate a project.
+
+    The replace is retried briefly. On Windows ``os.replace`` raises
+    PermissionError if anything else holds the destination open even for an
+    instant, and on a normal desktop that means the search indexer, a backup
+    agent or an antivirus scanner. The write itself is sound; the rename just
+    needs to be asked again a moment later.
+
+    Worth the twenty lines because of when it fails: the save that carries
+    forty hand-named parts.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     handle, tmp_name = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp")
     try:
         with os.fdopen(handle, "w", encoding="utf-8") as stream:
             json.dump(payload, stream, indent=2, ensure_ascii=False)
-        os.replace(tmp_name, path)
+
+        for attempt in range(attempts):
+            try:
+                os.replace(tmp_name, path)
+                return
+            except PermissionError:
+                if attempt == attempts - 1:
+                    raise
+                time.sleep(0.05 * (attempt + 1))
     except Exception:
         Path(tmp_name).unlink(missing_ok=True)
         raise
@@ -383,5 +401,5 @@ def import_project(payload: dict[str, Any]) -> Project:
 
 
 def encode_image_data_url(image: np.ndarray) -> str:
-    """Inline PNG data URL — used for report exports that must stay offline."""
+    """Inline PNG data URL: used for report exports that must stay offline."""
     return "data:image/png;base64," + base64.b64encode(encode_png_bytes(image)).decode("ascii")

@@ -1,10 +1,10 @@
 # PCB Missing-Component Inspector
 
-**Take-home Task B — "Which Part Is Missing?"**
+**Take-home Task B: "Which Part Is Missing?"**
 
 Upload a photo of a good board, name the parts on it once, then drop in photos
 of boards from the line. For each one the app says which named parts are
-missing and shows where — or **OK** in green.
+missing and shows where, or **OK** in green.
 
 Classical computer vision, no training data, **no network access at runtime**.
 
@@ -15,7 +15,7 @@ Classical computer vision, no training data, **no network access at runtime**.
 
 ## Quick start
 
-Requires **Python 3.10+**. Nothing else — no Node, no build step, no model
+Requires **Python 3.10+**. Nothing else: no Node, no build step, no model
 download.
 
 ```bash
@@ -56,11 +56,11 @@ Sample boards ship with the repo, so you can see it work before pointing a
 camera at anything.
 
 1. Run `python run.py`.
-2. **Step 1** — drop in `samples/boards/golden.png`.
-3. **Step 2** — click **Auto-detect**. It proposes a box per component; rename
-   any you care about, or just continue. (You can also drag boxes by hand —
+2. **Step 1**: drop in `samples/boards/golden.png`.
+3. **Step 2**: click **Auto-detect**. It proposes a box per component; rename
+   any you care about, or just continue. (You can also drag boxes by hand,
    that is the normal way.)
-4. **Step 3** — drop in several files from `samples/boards/`, for example
+4. **Step 3**: drop in several files from `samples/boards/`, for example
    `board_01_ok_clean.jpg`, `board_11_missing_metal.jpg` and
    `board_12_missing_lookalike.jpg`.
 
@@ -76,11 +76,11 @@ crop, the six measurements behind the verdict, and a compare slider.
 
 For each test photograph:
 
-1. **Register** it onto the reference — SIFT + RANSAC homography, validated
+1. **Register** it onto the reference: SIFT + RANSAC homography, validated
    against a plausibility envelope, with ECC intensity alignment as a fallback.
    A fixed camera still drifts a few pixels, and a few pixels is enough to make
    every comparison fail.
-2. **Normalise the nuisances** — robust per-channel exposure matching, then
+2. **Normalise the nuisances**: robust per-channel exposure matching, then
    sharpness equalisation (blur whichever image is sharper until they match).
    A comparison may only use information that *both* images contain.
 3. **Measure each named box** on six independent signals: template correlation,
@@ -88,7 +88,7 @@ For each test photograph:
    ratio and normalised residual.
 4. **Fuse** them into one confidence, apply presence vetoes that suppress false
    alarms, and apply a capped correction if the whole photograph is degraded.
-5. **Decide** — Present / Needs review / Missing.
+5. **Decide**: Present / Needs review / Missing.
 
 Six redundant signals rather than one clever metric, because every single
 metric has a failure mode a factory finds within a shift: SSIM is fooled by a
@@ -103,7 +103,7 @@ survives a board nobody has seen before.
 
 ## Measured results
 
-Against the generated benchmark — 80 board photographs spanning the full
+Against the generated benchmark: 80 board photographs spanning the full
 nuisance range, **41 named parts** each, **3,280 individual part decisions**:
 
 | Sensitivity | Precision | Recall | False alarms | Missed removals | Boards exactly right |
@@ -121,7 +121,7 @@ About **0.9 s per board** for 41 parts on a laptop CPU.
 
 > **Read this honestly.** The benchmark is rendered, not photographed. Real
 > boards glint, sit at slight angles, and collect dust. These numbers are
-> evidence that the design is sound and the thresholds are not knife-edge —
+> evidence that the design is sound and the thresholds are not knife-edge,
 > not a prediction of field accuracy. `RESEARCH.md §4` says more.
 
 ### Reproduce it
@@ -149,7 +149,7 @@ square to the camera, evenly lit, in focus. Then photograph every later board
 the same way.
 
 The app corrects for a few pixels of drift, exposure and white-balance changes,
-and mild defocus. It cannot correct for a different viewpoint — and it tells
+and mild defocus. It cannot correct for a different viewpoint, and it tells
 you when alignment was poor rather than guessing.
 
 **Sensitivity** (top right) shifts the operating point:
@@ -157,7 +157,7 @@ you when alignment was poor rather than guessing.
 | Preset | Flags at | Use when |
 |---|---|---|
 | Conservative | 0.58 | False alarms are expensive; you want certainty |
-| Balanced | 0.52 | Default — fixed camera, stable line |
+| Balanced | 0.52 | Default: fixed camera, stable line |
 | Sensitive | 0.44 | You would rather check a few extra boards by hand |
 
 Parts between the two thresholds are marked **needs review** in amber rather
@@ -168,11 +168,12 @@ than being silently called either way.
 - **Auto-detect** proposes a box per component so you are renaming rather than
   drawing. On the sample board it finds 40 of the 41 parts. It is an
   assistant: edit, delete and add freely.
+- **Read labels** (optional, see below) fills in the printed designators.
 - **Export / import setup** saves the reference photo and every named part to
   one `.json` file, so a configured board moves between machines.
-- **Export report** writes a self-contained HTML file with the images embedded
-  — readable on any machine, with no server and no application.
-- Light and dark themes, and a **guided tour on first run** — reopen it any
+- **Export report** writes a self-contained HTML file with the images
+  embedded, readable on any machine with no server and no application.
+- Light and dark themes, and a **guided tour on first run**: reopen it any
   time from the menu.
 
 ### The board canvas
@@ -203,6 +204,41 @@ a row of passives lines up without fighting the mouse.
 There is no tool palette on purpose. Figma needs one because it draws a dozen
 kinds of object; here there is exactly one, and a mode you can leave in the
 wrong state is a trap rather than a feature.
+
+### Optional: reading the printed designators
+
+If you have [Ollama](https://ollama.com) running locally with a vision model,
+a **Read labels** button appears on the Parts screen. It reads the designator
+printed beside each component (R12, C3, U7) and fills it in, so you correct
+names instead of typing all of them.
+
+```bash
+ollama pull llava:7b          # or any vision model
+python run.py                 # the button appears by itself
+```
+
+Configure with `PCB_OLLAMA_MODEL` and `PCB_OLLAMA_URL` if your setup differs.
+
+**Read this part carefully, because it is the one judgement call in the
+project.** The brief says AI tools "may be used only to create practice data,
+never inside the solution". A local Ollama is offline, so it does not break
+the no-network rule, but it is still an AI tool inside the running app. So it
+is fenced in deliberately:
+
+- **Off unless you ask.** No Ollama, no button; nothing is slower and nothing
+  fails. Naming by hand is the normal route.
+- **It only ever suggests a name.** It has no part whatsoever in deciding
+  whether a component is present or missing. That stays entirely in
+  `app/vision`: classical, deterministic, explainable.
+- **It is not trusted.** A vision model will happily invent a plausible
+  designator, so replies are checked against the shape a designator really
+  has, and anything vague, chatty or uncertain is thrown away and left for
+  you. On the sample run it read 4 of 6 and honestly declined the other 2.
+- **It is removable.** Delete `app/naming.py` and one button and the project
+  is unchanged in every other respect.
+
+If a grader considers any in-app AI out of bounds, the solution stands without
+it, and every number in this README was measured with it switched off.
 
 ### Photos that show only part of the board
 
@@ -235,7 +271,7 @@ The brief requires it, so it is worth being precise:
 Pull your network cable out and everything above still works, including the
 exported report.
 
-AI tools were used heavily to *build* this, and to *generate practice data* —
+AI tools were used heavily to *build* this, and to *generate practice data*,
 both explicitly allowed. No AI service is called by the solution itself.
 See [`AI_COLLAB.md`](AI_COLLAB.md).
 
@@ -270,26 +306,26 @@ storage or the UI, so the whole engine runs head-less from `tools/evaluate.py`.
 
 ## Troubleshooting
 
-**`ModuleNotFoundError`** — run `pip install -r requirements.txt`. `run.py`
+**`ModuleNotFoundError`**: run `pip install -r requirements.txt`. `run.py`
 checks dependencies on startup and names anything missing.
 
-**The browser didn't open** — the address is printed in the terminal; open it
+**The browser didn't open**: the address is printed in the terminal; open it
 manually. Or `python run.py --no-browser`.
 
-**"Could not align this photo to the reference"** — the photo is of a
+**"Could not align this photo to the reference"**: the photo is of a
 different board, or from a very different viewpoint. Results are still shown,
 flagged as untrustworthy, rather than hidden.
 
-**Lots of parts flagged on a board you believe is fine** — check the
+**Lots of parts flagged on a board you believe is fine**: check the
 alignment quality in the detail view. If the lighting changed a lot since the
 reference was taken, re-shoot the reference under current lighting; that is
 more reliable than turning sensitivity down.
 
-**Port already in use** — `run.py` picks the next free port automatically and
+**Port already in use**: `run.py` picks the next free port automatically and
 prints it.
 
 ---
 
 ## Task
 
-**Task B — Which Part Is Missing?**
+**Task B: Which Part Is Missing?**

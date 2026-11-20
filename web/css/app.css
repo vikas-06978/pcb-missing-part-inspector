@@ -1,5 +1,5 @@
 /* ==========================================================================
-   PCB Inspector — interface styles
+   PCB Inspector: interface styles
 
    Self-contained by requirement: no CDN, no web-font request, no external
    asset of any kind, because the application must run with the network
@@ -143,7 +143,7 @@ u { text-decoration-color: var(--brand-line); text-underline-offset: 3px; }
 
 ::selection { background: var(--brand-soft); }
 
-/* Scrollbars — thin, unobtrusive, themed. */
+/* Scrollbars: thin, unobtrusive, themed. */
 * { scrollbar-width: thin; scrollbar-color: var(--border-str) transparent; }
 *::-webkit-scrollbar { width: 10px; height: 10px; }
 *::-webkit-scrollbar-thumb {
@@ -1328,7 +1328,7 @@ dialog::backdrop { background: rgba(3, 6, 11, 0.68); backdrop-filter: blur(5px);
 .toast__text span { color: var(--text-mid); font-size: 0.82rem; line-height: 1.45; }
 
 /* --------------------------------------------------------------------------
-   15. Print — the inspection record
+   15. Print: the inspection record
    -------------------------------------------------------------------------- */
 
 @media print {

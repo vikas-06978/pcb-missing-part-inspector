@@ -102,7 +102,7 @@ export function stateColour(state) {
 }
 
 export function formatBytes(bytes) {
-  if (!bytes) return '—';
+  if (!bytes) return '-';
   const units = ['B', 'KB', 'MB', 'GB'];
   let value = bytes;
   let unit = 0;

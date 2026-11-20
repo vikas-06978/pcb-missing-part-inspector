@@ -423,7 +423,7 @@ export class Annotator {
       this.view.cancelAnimation();
       const point = this.view.pointer(event);
 
-      // Pan: middle button, right button, or space held — all three are
+      // Pan: middle button, right button, or space held, all three are
       // muscle memory somewhere, and none of them conflict with drawing.
       if (event.button === 1 || event.button === 2 || this.spaceDown) {
         this.mode = 'pan';

@@ -246,7 +246,7 @@ def draw_copper(board: np.ndarray, rng: np.random.Generator) -> None:
 
 
 # --------------------------------------------------------------------------
-# Footprints (always drawn — they remain when a part is removed)
+# Footprints (always drawn, they remain when a part is removed)
 # --------------------------------------------------------------------------
 
 
