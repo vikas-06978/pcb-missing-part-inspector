@@ -383,5 +383,13 @@ class SilkscreenConfig:
     #: wider as well as larger started producing wrong answers.
     strip_text_height: float = 100.0
 
+    #: How far from the predicted spot, in text heights, a reading may sit and
+    #: still be taken as this part's label. Measured over 122 correct readings
+    #: on two boards, the furthest a real label sat was 0.23, so this is about
+    #: six times the observed spread: generous enough that no genuine reading
+    #: is refused, tight enough that a neighbour's label caught at the edge of
+    #: the strip is. Without it there was no limit at all.
+    max_label_offset: float = 1.5
+
     #: Used only if the survey found text but could not measure its height.
     fallback_text_height: float = 10.0

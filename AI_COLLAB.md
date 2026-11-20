@@ -537,6 +537,29 @@ indistinguishable from a read one by the time it reaches the report. So the
 nine stay blank, the attempts are in the README, and the shipped number is
 still 32 of 41 with none wrong.
 
+**Asked for accuracy over coverage, I went looking for the hole.** The
+instruction was to keep what the reader gets right and never hand back
+anything wrong, so I stopped trying to read more and audited what could let a
+wrong name through. One real hole: the reading nearest the predicted label
+position was accepted no matter how far away it actually was. On this board
+the strips are narrow enough that it never bit, but a board with tighter
+silkscreen would have handed a part its neighbour's designator. Measured the
+spread over 122 correct readings, found the worst at 0.23 text heights, and
+put the limit at 1.5.
+
+The two guards that look obvious are both measured and both absent. A
+confidence floor does not separate anything here: the wrong reading available
+to test against scored 0.83 while correct ones go down to 0.69, so any floor
+that catches it discards a pile of right answers in exchange for the
+appearance of safety. Reading each strip at three sizes and keeping only
+readings that agree is worse than useless: tested against the configuration
+that does produce wrong answers, it removed none of them and added one. The
+errors are systematic, not random. An 8 px `R` and an 8 px `F` differ by two
+pixels and the reader is wrong about them the same way every time, so a check
+that fails identically to the thing it is checking is not a check. That is
+the part I would have got wrong by reasoning alone, because re-reading
+*feels* like verification.
+
 **Where I made myself less comfortable on purpose.** The obvious move was to
 turn this on by default, since it needs no install, no server and no key.
 I did not, because this project had already read the brief's "AI tools ...

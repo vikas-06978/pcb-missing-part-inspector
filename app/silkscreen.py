@@ -248,12 +248,20 @@ def read_label(
     # roughly eighty pixels of text height it starts inventing characters.
     upscale = max(1.0, CONFIG.strip_text_height / max(unit, 1.0))
 
+    # Nearest to where the label was predicted, and only if it is genuinely
+    # near. Without the limit, any designator-shaped text anywhere in the
+    # strip was accepted, so on a board that packs its silkscreen tighter
+    # than this one a neighbour's label sitting at the edge of the crop would
+    # have been taken as this part's name. Measured over 122 correct readings
+    # on two boards, the furthest a real label ever sat from its predicted
+    # centre was 0.23 text heights, so the limit below leaves several times
+    # the observed spread and still excludes anything a strip away.
     best, best_gap = "", float("inf")
     for text, cx, _cy, _h in _read(strip, upscale):
-        gap = abs(cx + x0 - ex)
+        gap = abs(cx + x0 - ex) / max(unit, 1.0)
         if gap < best_gap:
             best, best_gap = text, gap
-    return best
+    return best if best_gap <= CONFIG.max_label_offset else ""
 
 
 def read_labels(

@@ -318,6 +318,44 @@ The nine it leaves blank are the chips. Their designators are printed across a
 row of bright pins, and at 8 px the glyphs and the pins are one connected
 blob.
 
+#### What stops a wrong name
+
+Zero wrong answers is not luck, and it is not one check. A reading has to get
+past all of these before it is allowed to become a part's name:
+
+1. **It must look like a designator.** A letter prefix and a number, nothing
+   else. This is what rejects a chip's pin row coming back as a Chinese
+   character, which is a thing that happens.
+2. **It must be where a label belongs.** The reading has to sit within 1.5
+   text heights of where this board's learned convention puts the label.
+   Measured over 122 correct readings on two boards, the furthest a genuine
+   label ever sat was 0.23, so this refuses nothing real while excluding a
+   neighbour's label caught at the edge of the crop. Before this limit
+   existed, any designator-shaped text anywhere in the strip was accepted.
+3. **No two parts may claim the same designator.** When several do, at least
+   one is wrong and nothing says which, so every claimant is put back to a
+   placeholder rather than guessed between.
+4. **The board must have a convention at all.** If too few part/text pairs
+   agree on an offset, there is nothing to read against, so the reader
+   declines the whole board rather than inventing a placement.
+5. **Anything unread stays blank.** It is never filled from the component's
+   appearance, from a partial reading, or from the numbering of its
+   neighbours, all of which would work on this board and all of which are
+   guesses.
+
+Two further guards were measured and deliberately **not** added, because
+neither does what it looks like it does:
+
+| Guard | Why it is not here |
+|---|---|
+| Refuse readings the engine is unsure of | It does not separate them. The one wrong reading available to test against scored 0.83, while correct readings go down to 0.69. Any floor that catches it throws away a great many right answers, which is a cost paid for the appearance of safety. |
+| Read each strip at several sizes and keep only readings that agree | The errors are systematic, not random. `R` is read as `F` at every scale, so re-reading the same pixels reproduces the same mistake. Tested against the configuration that does get things wrong: agreement removed none of them and introduced one more. |
+
+The general lesson is in the second one. Re-reading catches noise, and these
+mistakes are not noise: an 8 px `R` and an 8 px `F` differ by two pixels, and
+the reader is wrong about them the same way every time. A check that cannot
+fail differently from the thing it is checking is not a check.
+
 #### Things that were tried and did not work
 
 Recorded because these negative results are the reason the above is shaped the
