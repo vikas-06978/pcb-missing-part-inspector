@@ -14,7 +14,7 @@ import cv2
 import numpy as np
 from PIL import Image, ImageOps
 
-from app.config import MIN_LONG_EDGE, WORKING_LONG_EDGE
+from app.config import MAX_DECODED_PIXELS, MIN_LONG_EDGE, WORKING_LONG_EDGE
 
 
 class ImageError(ValueError):
@@ -34,9 +34,24 @@ def decode_upload(data: bytes) -> np.ndarray:
 
     try:
         with Image.open(io.BytesIO(data)) as img:
+            # Refuse absurd dimensions before any pixels are allocated. A
+            # compressed file is allowed to be 40 MB, and a PNG that size can
+            # describe hundreds of megapixels, which would be decoded into
+            # memory before anything here got a say. Nothing this application
+            # does needs more than a few: the first thing that happens to a
+            # photograph is being scaled to the working size anyway.
+            pixels = (img.size[0] or 0) * (img.size[1] or 0)
+            if pixels > MAX_DECODED_PIXELS:
+                raise ImageError(
+                    f"That image is {img.size[0]}x{img.size[1]} pixels, which is "
+                    "larger than this application will open. Export it at a "
+                    "more usual size and try again."
+                )
             img = ImageOps.exif_transpose(img)
             img = img.convert("RGB")
             rgb = np.array(img)
+    except ImageError:
+        raise
     except Exception as exc:  # noqa: BLE001 - surface a friendly message
         raise ImageError(
             "That file could not be read as an image. "

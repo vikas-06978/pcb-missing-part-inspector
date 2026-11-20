@@ -43,6 +43,12 @@ ALLOWED_UPLOAD_TYPES = {
 }
 
 MAX_UPLOAD_BYTES = 40 * 1024 * 1024  # 40 MB per image
+
+#: Refused before decoding. The byte limit above does not bound memory: a
+#: compressed image is free to describe far more pixels than it occupies on
+#: disk, and those pixels are allocated before any of this code runs. Sixty
+#: megapixels is already several times more than the working size needs.
+MAX_DECODED_PIXELS = 60_000_000
 MAX_TEST_IMAGES_PER_RUN = 12
 
 # --------------------------------------------------------------------------

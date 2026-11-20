@@ -368,12 +368,19 @@ function renderPartListInner(annotator) {
       <input class="part-row__name" value="" maxlength="40" spellcheck="false"
              aria-label="Part name">
       <span class="part-row__dims">${part.bbox[2]}×${part.bbox[3]}</span>
-      <button class="part-row__del" type="button" title="Delete ${part.name}" aria-label="Delete part">
+      <button class="part-row__del" type="button" aria-label="Delete part">
         <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>
       </button>`;
 
     const input = row.querySelector('.part-row__name');
     input.value = part.name;
+    // Set as a property, never interpolated into the template above. A part
+    // name is the one piece of this screen somebody else can choose: project
+    // files are made to be exchanged, and a name like
+    //   " onmouseover="…
+    // dropped into a title attribute escapes it and runs. Assigning the
+    // property hands the string to the DOM as text and cannot do that.
+    row.querySelector('.part-row__del').title = `Delete ${part.name}`;
 
     input.addEventListener('focus', () => {
       // Only act on a real change of selection, so restoring focus during a

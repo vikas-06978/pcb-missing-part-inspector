@@ -567,6 +567,40 @@ The brief requires it, so it is worth being precise:
 Pull your network cable out and everything above still works, including the
 exported report.
 
+### Security
+
+It binds to loopback and holds no secrets, so the threat model is small but
+not empty. The one input that comes from somewhere else is a **project export
+file**, which exists to be passed between machines, and a part name inside it
+is shown back on screen.
+
+- **Part names never reach the markup.** They are assigned as DOM properties
+  and text, never interpolated into a template. Before this was fixed, a part
+  named `" onmouseover="…` escaped a `title` attribute and became a real
+  event handler: a stored cross-site-scripting hole, reachable by sending
+  somebody a project file. Verified fixed by importing exactly that name and
+  watching the attribute list.
+- **Imported files are not trusted.** Every part is rebuilt field by field:
+  the box must be four numbers with area, the id must match a safe pattern or
+  it is replaced, the name is truncated and stripped of control characters,
+  and a file claiming thousands of parts is refused. Previously the
+  dictionary was expanded straight into the dataclass, so a malformed export
+  produced a 500 rather than a message.
+- **`connect-src 'self'`.** The content security policy means a page served
+  from here cannot open a connection anywhere else. The offline promise is
+  enforced by the browser rather than resting on the code's good behaviour.
+  `script-src 'self'` and `object-src 'none'` close the rest.
+- **Path parameters are pattern-checked** before they touch the filesystem,
+  and the two that name a file are allow-listed rather than validated, so a
+  run id cannot walk out of its directory.
+- **Images are bounded before decoding.** The upload limit caps bytes, not
+  pixels, and a compressed file can describe far more pixels than it
+  occupies; anything over sixty megapixels is refused rather than allocated.
+
+What is deliberately *not* defended: anyone who can already run code on the
+machine, or reach port 8000 on it, can use the application. It is a local
+single-user tool and is not hardened into a multi-user service.
+
 AI tools were used heavily to *build* this, and to *generate practice data*,
 both explicitly allowed. No AI service is called by the solution itself.
 See [`AI_COLLAB.md`](AI_COLLAB.md).

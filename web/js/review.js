@@ -84,13 +84,16 @@ export class Review {
       card.className = 'review-card' + (placeholder ? ' is-unnamed' : '');
       card.dataset.id = part.id;
       card.innerHTML = `
-        <button class="review-card__thumb" type="button"
-                title="Open ${part.name} up close">
+        <button class="review-card__thumb" type="button">
           <canvas></canvas>
         </button>
         <input class="review-card__name" maxlength="40" spellcheck="false"
                aria-label="Name for part ${index + 1}">
         <span class="review-card__index">${index + 1} of ${all.length}</span>`;
+
+      // As a property rather than in the template: see the same note on the
+      // part list. Names can arrive from an imported project file.
+      card.querySelector('.review-card__thumb').title = `Open ${part.name} up close`;
 
       const input = card.querySelector('.review-card__name');
       input.value = placeholder ? '' : part.name;

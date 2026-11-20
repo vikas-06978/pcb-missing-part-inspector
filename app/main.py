@@ -42,6 +42,44 @@ app = FastAPI(title=APP_NAME, version=APP_VERSION, docs_url="/api/docs", redoc_u
 
 NO_STORE = {"Cache-Control": "no-store, max-age=0"}
 
+#: Sent on every response. The useful one is ``connect-src 'self'``, which
+#: turns this application's central promise into something the browser
+#: enforces rather than something the code merely refrains from doing: a page
+#: served from here cannot open a request to anywhere else, so nothing can be
+#: sent off the machine even if some future script tried. The rest closes the
+#: usual gaps. ``script-src 'self'`` means a part name carrying a payload
+#: cannot execute even if it escaped into the markup somewhere, which is a
+#: second lock on a door that is already shut.
+#:
+#: ``style-src`` keeps ``'unsafe-inline'`` because the interface positions the
+#: part boxes and the slab through style attributes, and there is no sense
+#: pretending otherwise with a nonce that the same page would hand straight
+#: back.
+SECURITY_HEADERS = {
+    "Content-Security-Policy": "; ".join((
+        "default-src 'self'",
+        "script-src 'self'",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data: blob:",
+        "font-src 'self'",
+        "connect-src 'self'",
+        "form-action 'none'",
+        "frame-ancestors 'none'",
+        "base-uri 'none'",
+        "object-src 'none'",
+    )),
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer",
+}
+
+
+@app.middleware("http")
+async def _security_headers(request, call_next):
+    response = await call_next(request)
+    for header, value in SECURITY_HEADERS.items():
+        response.headers.setdefault(header, value)
+    return response
+
 
 # --------------------------------------------------------------------------
 # Request models

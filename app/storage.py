@@ -18,6 +18,7 @@ import os
 import shutil
 import tempfile
 import time
+import re
 import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -362,6 +363,47 @@ def export_project(project: Project) -> dict[str, Any]:
     }
 
 
+SAFE_PART_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+MAX_IMPORTED_PARTS = 2000
+MAX_PART_NAME = 120
+
+
+def _part_from_export(raw: Any) -> Part:
+    """Build one part from an imported file, trusting none of it.
+
+    A project export is a file meant to be passed between people, so it is
+    input from outside and is treated that way. Splatting the dictionary
+    straight into the dataclass accepted whatever shape it happened to have:
+    an unexpected key raised a TypeError that surfaced as a 500, a bbox could
+    be strings or nested lists, and a name could be of any length and any
+    content at all. The name especially matters, because it is the one field
+    that gets shown back on screen.
+    """
+    if not isinstance(raw, dict):
+        raise ValueError("That project file has a part that is not an object.")
+
+    name = str(raw.get("name", "")).strip()[:MAX_PART_NAME] or "Unnamed part"
+    # Control characters have no business in a designator and make a mess of
+    # anything that later prints or exports it.
+    name = "".join(c for c in name if c.isprintable())
+
+    bbox = raw.get("bbox")
+    if not isinstance(bbox, (list, tuple)) or len(bbox) != 4:
+        raise ValueError(f"The part '{name}' has no usable box.")
+    try:
+        x, y, w, h = (int(v) for v in bbox)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"The part '{name}' has a box that is not numeric.") from exc
+    if w <= 0 or h <= 0:
+        raise ValueError(f"The part '{name}' has a box with no area.")
+
+    part_id = str(raw.get("id", ""))
+    if not SAFE_PART_ID.fullmatch(part_id):
+        part_id = uuid.uuid4().hex[:10]
+
+    return Part(id=part_id, name=name, bbox=[x, y, w, h])
+
+
 def import_project(payload: dict[str, Any]) -> Project:
     if payload.get("format") != EXPORT_FORMAT:
         raise ValueError("This file is not a PCB Inspector project export.")
@@ -371,15 +413,25 @@ def import_project(payload: dict[str, Any]) -> Project:
         )
 
     source = payload.get("project") or {}
+    if not isinstance(source, dict):
+        raise ValueError("That project file is not shaped like an export.")
+    raw_parts = source.get("parts") or []
+    if not isinstance(raw_parts, list):
+        raise ValueError("That project file has no usable list of parts.")
+    if len(raw_parts) > MAX_IMPORTED_PARTS:
+        raise ValueError(
+            f"That project file lists {len(raw_parts)} parts, which is more "
+            "than this application will open."
+        )
     now = time.time()
 
     project = Project(
         id=uuid.uuid4().hex[:12],
-        name=source.get("name", "Imported board"),
+        name=str(source.get("name", "Imported board"))[:MAX_PART_NAME],
         created_at=now,
         updated_at=now,
         sensitivity=source.get("sensitivity", DEFAULT_SENSITIVITY),
-        parts=[Part(**p) for p in source.get("parts", [])],
+        parts=[_part_from_export(p) for p in raw_parts],
     )
     project.directory.mkdir(parents=True, exist_ok=True)
 
