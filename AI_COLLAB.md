@@ -510,6 +510,33 @@ board, which is the entire job you were trying to avoid. An assistant that
 declines is useful; one that is quietly wrong one time in five is worse than
 no assistant at all.
 
+**Then I went after the last nine, and did not get them.** Asked to try, I
+spent another round on the labels the reader leaves blank: a taller strip
+choosing by distance in both axes, a tighter one to exclude the pins, eroding
+the bright mask to find solid blocks and inpainting the pins away, and reading
+each strip at three sizes to keep only readings that agree. Every one was
+measured on both boards and every one was neutral or worse, the tight crop
+notably so: it starts reading `R7` as `F7`, which is the failure mode worth
+least.
+
+The diagnosis is the useful part. I had assumed the chips failed because
+their designators are printed over a pin row, and that was wrong twice over.
+First, the labels are where the convention predicts, within a pixel, for the
+parts that fail exactly as for the parts that work. Second, asking the reader
+what it sees gives `J2` as `2`, `R7` as `7`, `Q1` as `01`, `U5` as `UG`, and
+a chip's pins as a Chinese character. These are character-level failures of
+an 8 px single-stroke font read by a model trained mainly on Chinese, not a
+placement or clutter problem, so no amount of cropping was ever going to
+help. I had been fixing the wrong thing again, which is the same mistake as
+earlier in this entry, caught two rounds faster.
+
+What is left would be guessing: inferring the letter from the component's
+appearance, or completing the numbering from its neighbours. Both work on
+this board and both are inventions, and an invented designator is
+indistinguishable from a read one by the time it reaches the report. So the
+nine stay blank, the attempts are in the README, and the shipped number is
+still 32 of 41 with none wrong.
+
 **Where I made myself less comfortable on purpose.** The obvious move was to
 turn this on by default, since it needs no install, no server and no key.
 I did not, because this project had already read the brief's "AI tools ...

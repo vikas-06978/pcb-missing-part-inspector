@@ -330,6 +330,36 @@ way it is.
 | Remove long bright structures so pins stop merging with the glyphs | Deletes the text along with the pins. At this scale they are one component. |
 | Force a one-to-one assignment of texts to parts | 14 correct became 7. The reader finds only about half the labels, so forcing exclusivity starves the rest. |
 | Allow a board two label conventions instead of one | Recovered nothing and introduced 2 wrong answers. |
+| Taller strip, pick the text nearest the predicted spot in both axes | 61 of 82, down from 64. The reader wants a tight crop. |
+| Tighter strip, to exclude the pins and bodies sharing it | Much worse, 47 of 82, and it starts reading `R7` as `F7`. |
+| Erode the bright mask to find solid blocks, then inpaint the pins away | Erosion destroys the strokes too; inpainting changes nothing. |
+| Read each strip at three sizes and keep only readings that agree | No gain at all, and three times slower. |
+
+#### Why the last nine cannot be read
+
+Worth stating, because it says where the ceiling actually is. The nine are
+not misplaced and they are not buried in clutter: the designator sits within
+about a pixel of where the convention predicts, for the parts that fail
+exactly as for the parts that work. Asking the reader what it sees there
+gives character-level failures, not blanks:
+
+| Printed | Read as |
+|---|---|
+| `J2` | `2` |
+| `R7` | `7` |
+| `Q1` | `01` |
+| `U5` | `UG` |
+| `U2` | a Chinese character |
+
+This is a single-stroke vector font at 8 px, where `R` and `F` differ by two
+pixels and `Q` and `0` by three, read by a model trained mainly on Chinese
+text, which is why a chip's pin row comes back as a CJK glyph. Nothing about
+the crop, the scale or the preprocessing fixes a glyph that does not carry
+enough pixels to be distinguished. The remaining routes all amount to
+guessing: inferring the letter from what the component looks like, or filling
+gaps from the numbering of its neighbours. Boards legitimately have gaps, and
+a guessed designator is indistinguishable from a read one by the time it
+reaches the report, so the reader leaves them blank and says so.
 
 One caveat in the reader's favour: this board's silkscreen is a single-stroke
 vector font at 8 px, which is harder than the solid typeface a real board is
