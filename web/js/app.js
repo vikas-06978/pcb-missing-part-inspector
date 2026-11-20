@@ -134,6 +134,7 @@ async function refreshProject(project) {
   }
 
   $('#sensitivity').value = project.sensitivity;
+  updateStatus();
   goTo(state.step);
 }
 
@@ -230,6 +231,36 @@ function openPartView(partId, fromRect) {
   state.partView.open(partId, fromRect);
 }
 
+/**
+ * Keep the status bar honest about what the app is working on.
+ *
+ * Called whenever the project changes rather than on a timer, so it never
+ * shows a state the app has already left.
+ */
+function updateStatus(engine) {
+  const project = state.project;
+  const led = $('#status-led');
+
+  if (engine) {
+    $('#status-engine').textContent = engine;
+    led.className = 'led led--busy';
+  } else {
+    $('#status-engine').textContent = 'Engine ready';
+    led.className = 'led led--ok';
+  }
+
+  $('#status-board').textContent = project?.reference
+    ? `${project.reference.width}x${project.reference.height}`
+    : 'none loaded';
+  $('#status-parts').textContent = String(project?.parts?.length ?? 0);
+
+  const preset = state.config?.sensitivity_presets
+    ?.find((p) => p.key === (project?.sensitivity || state.config?.default_sensitivity));
+  $('#status-sensitivity').textContent = preset
+    ? `${preset.label} (${preset.missing_threshold.toFixed(2)})`
+    : '-';
+}
+
 function updateZoomReadout() {
   if (!state.annotator) return;
   $('#zoom-readout').textContent = `${Math.round(state.annotator.view.scale * 100)}%`;
@@ -267,6 +298,7 @@ function renderPartListInner(annotator) {
   $('#parts-count').textContent = String(parts.length);
   $('#parts-empty').classList.toggle('is-hidden', parts.length > 0);
   $('#reference-parts').textContent = String(parts.length);
+  $('#status-parts').textContent = String(parts.length);
   $('#to-inspect').disabled = parts.length === 0;
 
   const active = document.activeElement;
@@ -475,6 +507,7 @@ async function suggestParts() {
   const button = $('#suggest-parts');
   button.disabled = true;
   button.textContent = 'Detecting…';
+  updateStatus('Detecting components');
   try {
     const { suggestions } = await api.suggest();
     if (!suggestions.length) {
@@ -490,6 +523,7 @@ async function suggestParts() {
   } catch (error) {
     toast('Auto-detect failed', error.message, 'error');
   } finally {
+    updateStatus();
     button.disabled = false;
     button.innerHTML =
       '<svg viewBox="0 0 24 24" class="btn__icon" aria-hidden="true">'
@@ -534,6 +568,8 @@ async function inspect(files) {
     fill.style.width = `${Math.min(92, (elapsed / expected) * 100)}%`;
   }, 100);
 
+  updateStatus(`Inspecting ${files.length} board${files.length === 1 ? '' : 's'}`);
+
   try {
     const response = await api.inspect(files, $('#sensitivity').value);
     fill.style.width = '100%';
@@ -558,6 +594,7 @@ async function inspect(files) {
     if (!state.results.length) $('#inspect-empty').classList.remove('is-hidden');
   } finally {
     clearInterval(ticker);
+    updateStatus();
     setTimeout(() => {
       progress.classList.add('is-hidden');
       fill.style.width = '0%';
@@ -782,6 +819,7 @@ async function main() {
     try {
       state.project = await api.patchProject({ sensitivity: select.value });
       const preset = state.config.sensitivity_presets.find((p) => p.key === select.value);
+      updateStatus();
       toast(`Sensitivity: ${preset.label}`, preset.description);
     } catch (error) {
       toast('Could not change sensitivity', error.message, 'error');

@@ -10,6 +10,7 @@ Classical computer vision, no training data, **no network access at runtime**.
 
 ![Naming parts on the reference board](docs/screenshots/01-name-parts.png)
 ![Inspection results](docs/screenshots/02-inspect-results.png)
+![Looking at one part closely](docs/screenshots/03-part-inspector.png)
 
 ---
 

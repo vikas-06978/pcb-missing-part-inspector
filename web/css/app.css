@@ -1509,3 +1509,65 @@ dialog::backdrop { background: rgba(3, 6, 11, 0.68); backdrop-filter: blur(5px);
 @media (prefers-reduced-motion: reduce) {
   .partview__slab { transition: none; }
 }
+
+
+/* --------------------------------------------------------------------------
+   18. Status bar
+
+   The line a piece of equipment carries along its bottom edge: what it is
+   working on and what state it is in, always visible, never in the way. It
+   also keeps the offline guarantee on screen rather than buried in a README,
+   which is the claim most worth being able to point at during a demo.
+   -------------------------------------------------------------------------- */
+
+.statusbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 30px;
+  padding: 0 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.statusbar__item { display: flex; align-items: center; gap: 7px; }
+.statusbar__item b { color: var(--text-mid); font-weight: 600; }
+.statusbar__item--muted b { color: var(--text-dim); }
+.statusbar__sep { width: 1px; height: 13px; background: var(--border); flex: none; }
+.statusbar__spacer { margin-left: auto; }
+
+.led {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 18%, transparent);
+}
+.led--ok   { background: var(--ok);     color: var(--ok); }
+.led--busy { background: var(--review); color: var(--review); }
+.led--idle { background: var(--text-dim); color: var(--text-dim); }
+
+@media (max-width: 760px) {
+  .statusbar__item:not(:first-child):not(.statusbar__item--muted) { display: none; }
+}
+
+/* Numbers belong in a monospaced, tabular face: they are read and compared,
+   not prose. This also stops a changing readout shuffling its own width. */
+.zoom-readout,
+.part-row__dims,
+.stat__value,
+.board-card__foot,
+.diag-row dd,
+.ev-row__value,
+.confidence-bar__legend,
+.meta-list dd {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
