@@ -173,8 +173,8 @@ than being silently called either way.
   one `.json` file, so a configured board moves between machines.
 - **Export report** writes a self-contained HTML file with the images
   embedded, readable on any machine with no server and no application.
-- Light and dark themes, and a **guided tour on first run**: reopen it any
-  time from the menu.
+- Light and dark themes (light by default), and a **guided tour on first
+  run**: reopen it any time from the menu.
 
 ### The board canvas
 

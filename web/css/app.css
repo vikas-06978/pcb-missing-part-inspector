@@ -15,22 +15,22 @@
    1. Tokens
    -------------------------------------------------------------------------- */
 
+/* --------------------------------------------------------------------------
+   1. Tokens
+
+   One restrained accent, used only for interactive things. Status colour is
+   reserved entirely for verdicts, so green, amber and red never appear
+   decoratively and always mean exactly one thing on a board.
+
+   Light is the default. This gets shown on a projector and over screen share,
+   where a dark interface loses contrast and reads as a consumer app rather
+   than a piece of inspection equipment.
+   -------------------------------------------------------------------------- */
+
 :root {
-  --brand:        #6e8bff;
-  --brand-alt:    #a78bfa;
-  --brand-soft:   rgba(110, 139, 255, 0.14);
-  --brand-line:   rgba(110, 139, 255, 0.42);
-
-  --ok:           #2bd47d;
-  --ok-soft:      rgba(43, 212, 125, 0.13);
-  --review:       #f5a524;
-  --review-soft:  rgba(245, 165, 36, 0.14);
-  --missing:      #fb5d6d;
-  --missing-soft: rgba(251, 93, 109, 0.14);
-
-  --radius-sm: 8px;
-  --radius:    13px;
-  --radius-lg: 20px;
+  --radius-sm: 6px;
+  --radius:    8px;
+  --radius-lg: 12px;
 
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -40,56 +40,73 @@
   --mono: "SF Mono", "Cascadia Mono", "Segoe UI Mono", "Roboto Mono",
           ui-monospace, Menlo, Consolas, monospace;
 
-  --appbar-h: 68px;
-}
-
-:root[data-theme="dark"] {
-  --bg:          #070a10;
-  --surface-1:   #0d121b;
-  --surface-2:   #121a26;
-  --surface-3:   #18222f;
-  --surface-up:  #1d2838;
-  --border:      #1f2b3c;
-  --border-soft: #192332;
-  --border-str:  #2d3f58;
-
-  --text:        #e9eff8;
-  --text-mid:    #9fb0c6;
-  --text-dim:    #6b7c93;
-
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5);
-  --shadow-2: 0 8px 24px -8px rgba(0, 0, 0, 0.7);
-  --shadow-3: 0 28px 70px -24px rgba(0, 0, 0, 0.85);
-  --glass: rgba(13, 18, 27, 0.72);
-  --aurora-opacity: 0.5;
-  --canvas-bg: #070a10;
+  --appbar-h: 60px;
 }
 
 :root[data-theme="light"] {
-  --bg:          #f2f5fa;
+  --bg:          #f6f7f9;
   --surface-1:   #ffffff;
-  --surface-2:   #f7f9fc;
-  --surface-3:   #eef2f8;
+  --surface-2:   #fafbfc;
+  --surface-3:   #f1f3f5;
   --surface-up:  #ffffff;
-  --border:      #dde4ee;
-  --border-soft: #e8edf4;
-  --border-str:  #c3cedd;
+  --border:      #e3e6ea;
+  --border-soft: #eef0f3;
+  --border-str:  #d0d5dc;
 
-  --text:        #0d1522;
-  --text-mid:    #4e6076;
-  --text-dim:    #74859a;
+  --text:        #15181d;
+  --text-mid:    #596273;
+  --text-dim:    #8a93a3;
 
-  --brand-soft:  rgba(110, 139, 255, 0.11);
-  --ok:          #12a85e;
-  --review:      #c77700;
-  --missing:     #e0384f;
+  --brand:       #2f6feb;
+  --brand-alt:   #2f6feb;
+  --brand-soft:  #eaf1fe;
+  --brand-line:  #bdd3fb;
 
-  --shadow-1: 0 1px 2px rgba(16, 32, 56, 0.07);
-  --shadow-2: 0 10px 26px -12px rgba(16, 32, 56, 0.22);
-  --shadow-3: 0 30px 70px -28px rgba(16, 32, 56, 0.3);
-  --glass: rgba(255, 255, 255, 0.78);
-  --aurora-opacity: 0.32;
-  --canvas-bg: #e9eef5;
+  --ok:           #0f7a52;
+  --ok-soft:      #e6f5ee;
+  --review:       #9a5b06;
+  --review-soft:  #fdf2e2;
+  --missing:      #b4231c;
+  --missing-soft: #fdeceb;
+
+  --shadow-1: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --shadow-2: 0 1px 3px rgba(16, 24, 40, 0.08), 0 1px 2px rgba(16, 24, 40, 0.04);
+  --shadow-3: 0 12px 28px -8px rgba(16, 24, 40, 0.16);
+  --glass: rgba(255, 255, 255, 0.92);
+  --canvas-bg: #eceef1;
+}
+
+:root[data-theme="dark"] {
+  --bg:          #0f1115;
+  --surface-1:   #16181d;
+  --surface-2:   #1b1e24;
+  --surface-3:   #21252c;
+  --surface-up:  #1b1e24;
+  --border:      #282c34;
+  --border-soft: #22262c;
+  --border-str:  #363b44;
+
+  --text:        #e7e9ed;
+  --text-mid:    #9aa3b2;
+  --text-dim:    #6b7482;
+
+  --brand:       #5b8def;
+  --brand-alt:   #5b8def;
+  --brand-soft:  #1a2338;
+  --brand-line:  #2f4273;
+
+  --ok:           #3fbd87;
+  --ok-soft:      #11291f;
+  --review:       #d79440;
+  --review-soft:  #2a1f10;
+  --missing:      #ef6a63;
+  --missing-soft: #2d1716;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-2: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-3: 0 12px 28px -8px rgba(0, 0, 0, 0.6);
+  --glass: rgba(22, 24, 29, 0.92);
+  --canvas-bg: #101216;
 }
 
 /* --------------------------------------------------------------------------
@@ -155,50 +172,10 @@ u { text-decoration-color: var(--brand-line); text-underline-offset: 3px; }
 *::-webkit-scrollbar-track { background: transparent; }
 
 /* --------------------------------------------------------------------------
-   3. Ambient background
+   3. Reduced motion
    -------------------------------------------------------------------------- */
 
-.aurora {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  overflow: hidden;
-  pointer-events: none;
-  opacity: var(--aurora-opacity);
-}
-
-.aurora__blob {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(110px);
-  will-change: transform;
-}
-
-.aurora__blob--a {
-  width: 46vw; height: 46vw;
-  top: -16vw; left: -8vw;
-  background: radial-gradient(circle, var(--brand) 0%, transparent 68%);
-  animation: drift-a 34s var(--ease) infinite alternate;
-}
-.aurora__blob--b {
-  width: 38vw; height: 38vw;
-  top: 14vh; right: -10vw;
-  background: radial-gradient(circle, var(--brand-alt) 0%, transparent 68%);
-  animation: drift-b 41s var(--ease) infinite alternate;
-}
-.aurora__blob--c {
-  width: 34vw; height: 34vw;
-  bottom: -14vw; left: 32vw;
-  background: radial-gradient(circle, #2bd4c0 0%, transparent 70%);
-  animation: drift-c 47s var(--ease) infinite alternate;
-}
-
-@keyframes drift-a { to { transform: translate3d(7vw, 6vh, 0) scale(1.14); } }
-@keyframes drift-b { to { transform: translate3d(-6vw, 9vh, 0) scale(0.88); } }
-@keyframes drift-c { to { transform: translate3d(5vw, -7vh, 0) scale(1.1); } }
-
 @media (prefers-reduced-motion: reduce) {
-  .aurora__blob { animation: none; }
   *, *::before, *::after {
     animation-duration: 0.001ms !important;
     transition-duration: 0.001ms !important;
@@ -218,23 +195,14 @@ u { text-decoration-color: var(--brand-line); text-underline-offset: 3px; }
   align-items: center;
   gap: 24px;
   padding: 0 22px;
-  background: var(--glass);
-  backdrop-filter: blur(22px) saturate(180%);
-  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  background: var(--surface-1);
   border-bottom: 1px solid var(--border);
 }
 
 .appbar__brand { display: flex; align-items: center; gap: 11px; min-width: 0; }
 
 .mark { width: 34px; height: 34px; flex: none; }
-.mark__trace {
-  stroke-dasharray: 46;
-  stroke-dashoffset: 46;
-  animation: trace 1.5s var(--ease-out) 0.15s forwards;
-}
-.mark__node { opacity: 0; animation: pop 0.5s var(--ease-out) 1.1s forwards; }
-@keyframes trace { to { stroke-dashoffset: 0; } }
-@keyframes pop { to { opacity: 1; } }
+
 
 .appbar__titles { min-width: 0; }
 .appbar__titles h1 {
@@ -358,14 +326,15 @@ u { text-decoration-color: var(--brand-line); text-underline-offset: 3px; }
 .btn:disabled { opacity: 0.42; cursor: not-allowed; }
 
 .btn--primary {
-  background: linear-gradient(135deg, var(--brand), var(--brand-alt));
-  border-color: transparent;
+  background: var(--brand);
+  border-color: var(--brand);
   color: #fff;
-  box-shadow: 0 6px 18px -8px var(--brand), var(--shadow-1);
+  box-shadow: var(--shadow-1);
 }
 .btn--primary:hover:not(:disabled) {
-  filter: brightness(1.07);
-  box-shadow: 0 10px 26px -10px var(--brand), var(--shadow-1);
+  filter: brightness(0.94);
+  background: var(--brand);
+  border-color: var(--brand);
 }
 
 .btn--ghost { background: transparent; }
@@ -510,7 +479,6 @@ u { text-decoration-color: var(--brand-line); text-underline-offset: 3px; }
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   background: var(--surface-1);
-  box-shadow: var(--shadow-2);
 }
 
 .note { color: var(--text-dim); font-size: 0.8rem; line-height: 1.5; }
@@ -626,7 +594,6 @@ u { text-decoration-color: var(--brand-line); text-underline-offset: 3px; }
   border: 1px solid var(--border);
   background: var(--surface-1);
   overflow: hidden;
-  box-shadow: var(--shadow-2);
 }
 
 .stage-toolbar {
@@ -786,9 +753,7 @@ u { text-decoration-color: var(--brand-line); text-underline-offset: 3px; }
   padding: 9px 18px;
   border-radius: 99px;
   border: 1px solid var(--border);
-  background: var(--glass);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background: var(--surface-1);
   color: var(--text-mid);
   font-size: 0.82rem;
   pointer-events: none;
@@ -800,7 +765,6 @@ u { text-decoration-color: var(--brand-line); text-underline-offset: 3px; }
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   background: var(--surface-1);
-  box-shadow: var(--shadow-2);
   max-height: min(calc(66vh + 48px), 728px);
   overflow: hidden;
 }
@@ -905,7 +869,7 @@ u { text-decoration-color: var(--brand-line); text-underline-offset: 3px; }
   height: 100%;
   width: 0;
   border-radius: 99px;
-  background: linear-gradient(90deg, var(--brand), var(--brand-alt));
+  background: var(--brand);
   transition: width 0.35s var(--ease);
 }
 .progress p { margin-top: 9px; color: var(--text-mid); font-size: 0.84rem; }
@@ -944,7 +908,7 @@ u { text-decoration-color: var(--brand-line); text-underline-offset: 3px; }
   background: var(--surface-1);
   overflow: hidden;
   cursor: pointer;
-  box-shadow: var(--shadow-2);
+  box-shadow: var(--shadow-1);
   transition: transform 0.26s var(--ease-out), box-shadow 0.26s var(--ease-out),
               border-color 0.2s var(--ease);
   animation: card-in 0.45s var(--ease-out) both;
@@ -954,8 +918,7 @@ u { text-decoration-color: var(--brand-line); text-underline-offset: 3px; }
   to   { opacity: 1; transform: none; }
 }
 .board-card:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--shadow-3);
+  box-shadow: var(--shadow-2);
   border-color: var(--border-str);
 }
 
@@ -1332,7 +1295,6 @@ dialog::backdrop { background: rgba(3, 6, 11, 0.68); backdrop-filter: blur(5px);
    -------------------------------------------------------------------------- */
 
 @media print {
-  .aurora, .appbar, .dropzone, .toasts, .panel__head .row { display: none !important; }
   body { background: #fff; color: #000; }
   .board-card { break-inside: avoid; box-shadow: none; border: 1px solid #999; }
   .results { grid-template-columns: 1fr 1fr; }

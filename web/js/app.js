@@ -37,9 +37,11 @@ const state = {
    ========================================================================= */
 
 function initTheme() {
+  // Light by default rather than following the OS. This is shown on a
+  // projector and over screen share, where dark loses contrast; someone who
+  // wants dark chooses it once and it is remembered.
   const stored = localStorage.getItem('pcb-theme');
-  const preferred = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-  document.documentElement.dataset.theme = stored || preferred;
+  document.documentElement.dataset.theme = stored || 'light';
 
   $('#theme-toggle').addEventListener('click', () => {
     const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
