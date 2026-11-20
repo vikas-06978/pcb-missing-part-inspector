@@ -119,10 +119,19 @@ class InspectionResult:
         checked = len(self.verdicts) - len(unseen)
         if missing:
             status = STATE_MISSING
+            # Say both numbers when there are both. A board that reads
+            # "5 parts missing" while another five sit waiting for someone to
+            # look at them has told the operator the smaller half of the
+            # story, and the half it left out is the half that needs them.
             headline = (
                 f"{len(missing)} part missing" if len(missing) == 1
                 else f"{len(missing)} parts missing"
             )
+            if review:
+                headline += (
+                    ", 1 to check" if len(review) == 1
+                    else f", {len(review)} to check"
+                )
         elif review:
             status = STATE_REVIEW
             headline = (

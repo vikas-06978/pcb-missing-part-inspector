@@ -746,6 +746,7 @@ function cumulativeBatch() {
     ok_count: state.results.filter((r) => r.summary.status === 'present').length,
     missing_boards: state.results.filter((r) => r.summary.missing_count > 0).length,
     total_missing_parts: state.results.reduce((sum, r) => sum + r.summary.missing_count, 0),
+    total_review_parts: state.results.reduce((sum, r) => sum + r.summary.review_count, 0),
   };
 }
 

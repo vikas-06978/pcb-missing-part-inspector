@@ -102,7 +102,13 @@ export function renderBatchSummary(host, batch) {
     <div class="stat">
       <span class="stat__value">${batch.total_missing_parts}</span>
       <span class="stat__label">Parts missing in total</span>
-    </div>`;
+    </div>
+    ${batch.total_review_parts ? `
+    <span class="stat__sep"></span>
+    <div class="stat stat--review">
+      <span class="stat__value">${batch.total_review_parts}</span>
+      <span class="stat__label">Parts to check by eye</span>
+    </div>` : ''}`;
 }
 
 export async function renderCards(host, results, onOpen) {
@@ -116,10 +122,18 @@ export async function renderCards(host, results, onOpen) {
     const { status, headline, missing_names: missing, review_names: review } = result.summary;
     const kind = bannerKind(status);
 
+    // Two kinds of chip and they mean different things, so they are labelled
+    // rather than left to colour alone: one says a part is not there, the
+    // other says the photo was not good enough here to be sure either way.
     const chips = [
       ...missing.map((name) => `<span class="chip chip--missing">${escapeHtml(name)}</span>`),
-      ...review.map((name) => `<span class="chip chip--review">${escapeHtml(name)}</span>`),
     ];
+    if (review.length) {
+      chips.push('<span class="chip chip--label">check</span>');
+      chips.push(
+        ...review.map((name) => `<span class="chip chip--review">${escapeHtml(name)}</span>`),
+      );
+    }
     if (!chips.length) {
       chips.push(
         `<span class="chip chip--muted">${result.summary.checked_count} parts verified</span>`,
@@ -554,6 +568,10 @@ export async function buildReport(results, projectName) {
           alignment ${(result.alignment.quality * 100).toFixed(0)}% ·
           ${result.elapsed_ms.toFixed(0)} ms
         </p>
+        ${(result.warnings || []).length ? `
+        <ul class="notes">
+          ${result.warnings.map((w) => `<li>${escapeHtml(w)}</li>`).join('')}
+        </ul>` : ''}
         <img src="${dataUrl}" alt="Inspected board">
         <table>
           <thead><tr><th>Part</th><th>State</th><th>Confidence</th><th>Reason</th></tr></thead>
@@ -580,6 +598,9 @@ export async function buildReport(results, projectName) {
   .s-missing{color:#d12c43}.s-review{color:#b26a00}.s-present{color:#0f8f52}
   h2.s-present{color:#0f8f52}h2.s-missing{color:#d12c43}h2.s-review{color:#b26a00}
   footer{color:#8494a8;font-size:.78rem;text-align:center;margin-top:30px}
+  .notes{margin:0 0 14px;padding:10px 14px 10px 30px;background:#fff8ec;
+         border:1px solid #f0dcb8;border-radius:10px;color:#7a5a16;font-size:.82rem}
+  .notes li{margin:3px 0}
 </style></head>
 <body>
   <h1>Inspection report</h1>

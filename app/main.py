@@ -486,6 +486,10 @@ def run_inspection(
         storage.save_project(project)
 
     total_missing = sum(r["summary"]["missing_count"] for r in results)
+    # Reported alongside the missing count, not folded into it. A part sent
+    # for review is not a fault and not a pass; it is work the operator still
+    # has to do, and a batch summary that hides it understates the job.
+    total_review = sum(r["summary"]["review_count"] for r in results)
     return {
         "results": results,
         "batch": {
@@ -493,6 +497,7 @@ def run_inspection(
             "ok_count": sum(1 for r in results if r["summary"]["status"] == "present"),
             "missing_boards": sum(1 for r in results if r["summary"]["missing_count"] > 0),
             "total_missing_parts": total_missing,
+            "total_review_parts": total_review,
         },
     }
 
