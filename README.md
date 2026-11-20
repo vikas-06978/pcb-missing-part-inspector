@@ -242,15 +242,45 @@ feature is fenced in deliberately:
 - **It only ever suggests a name.** It has no part whatsoever in deciding
   whether a component is present or missing. That stays entirely in
   `app/vision`: classical, deterministic, explainable.
-- **It is not trusted.** A vision model will happily invent a plausible
-  designator, so replies are checked against the shape a designator really
-  has, and anything vague, chatty or uncertain is thrown away and left for
-  you. On the sample run it read 4 of 6 and honestly declined the other 2.
+- **It is not trusted.** Replies are checked against the shape a designator
+  really has, and when two parts claim the same designator all the claimants
+  are refused, because one of them is certainly wrong and nothing says which.
 - **It is removable.** Delete `app/naming.py` and one button and the project
   is unchanged in every other respect.
 
 If a grader considers any in-app AI out of bounds, the solution stands without
-it, and every number in this README was measured with it switched off.
+it, and every inspection number in this README was measured with it switched
+off.
+
+#### How well does it actually work? Not well enough to rely on
+
+Measured on the 41-part sample board, `qwen2.5vl:3b`, GTX 1650 (4 GB):
+
+| | Raw | With the duplicate guard |
+|---|---|---|
+| Correct | 30 / 41 (73%) | 26 / 41 (63%) |
+| **Confidently wrong** | **8 / 41 (20%)** | **4 / 41 (10%)** |
+| Left for you | 3 / 41 (7%) | 11 / 41 (27%) |
+
+**48 s per part, so about 33 minutes for one board.**
+
+Seven of the eight wrong answers were the designator of a *different real
+component*: it reads the neighbour's label. `C6` became `C4`, `Q1` became
+`Q2`, `R4` became `R5`. That is the dangerous kind of wrong, because the name
+looks entirely plausible and you only catch it by checking against the board.
+
+The duplicate guard exploits exactly that pattern, and halves the wrong
+answers by refusing every claimant when two parts want the same designator.
+It cannot catch a wrong answer that happens to be unique, so one in ten still
+slips through.
+
+**The honest conclusion: typing is better.** You would wait 33 minutes, then
+have to verify all 41 names anyway, and checking 41 names against a board is
+about as much work as typing them. `Enter` moves to the next field, so naming
+a board by hand takes a couple of minutes. The feature stays because it was
+asked for and because it may be worth more on a board with clearer silkscreen
+or on a machine that can run a 7B model, but it is off by default and this
+table is why.
 
 ### Photos that show only part of the board
 

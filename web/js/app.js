@@ -388,36 +388,62 @@ async function readNames() {
   const original = button.innerHTML;
   state.readingNames = true;
 
-  let read = 0;
-  let skipped = 0;
+  // Collect every suggestion first, then decide. Measured on the sample board,
+  // the model's mistakes are almost entirely neighbour confusion: seven of its
+  // eight wrong answers were the designator of a different real component.
+  //
+  // Two parts cannot share a designator, so when several parts claim the same
+  // one, at least one of them is wrong and there is no way to tell which. All
+  // the claimants are refused rather than guessed between, which turns a
+  // silent mislabel into a part that still visibly needs naming.
+  //
+  // Resolving after the fact matters: rejecting duplicates as they arrive
+  // simply rejects whichever claim lands second, and the wrong answer usually
+  // arrives first. Tried that; it dropped correct names without removing a
+  // single wrong one.
+  const suggestions = new Map();
+  let unreadable = 0;
 
   try {
     for (const [index, part] of parts.entries()) {
       if (!state.readingNames) break;
       button.textContent = `Stop (${index + 1}/${parts.length})`;
-
       try {
         const { name } = await api.suggestName(part.id);
-        if (name) {
-          annotator.renamePart(part.id, name);
-          read += 1;
-        } else {
-          skipped += 1;
-        }
+        if (name) suggestions.set(part.id, name.trim());
+        else unreadable += 1;
       } catch (error) {
         toast('Stopped reading labels', error.message, 'error');
         break;
       }
     }
+
+    const claims = new Map();
+    for (const name of suggestions.values()) {
+      const key = name.toLowerCase();
+      claims.set(key, (claims.get(key) || 0) + 1);
+    }
+
+    let read = 0;
+    let contested = 0;
+    for (const [partId, name] of suggestions) {
+      if (claims.get(name.toLowerCase()) > 1) {
+        contested += 1;
+      } else {
+        annotator.renamePart(partId, name);
+        read += 1;
+      }
+    }
     await savePartsNow();
 
+    const left = unreadable + contested;
     if (read) {
       toast(
-        `Read ${read} label${read === 1 ? '' : 's'}`,
-        skipped
-          ? `${skipped} could not be read and were left as they were. Check them before inspecting.`
-          : 'Check them before inspecting.',
-        'success',
+        `Read ${read} of ${parts.length} labels`,
+        `${left ? `${left} left for you${contested ? ` (${contested} contested)` : ''}. ` : ''}`
+        + 'Check every name against the board: roughly one in ten can still be '
+        + 'the neighbouring part’s label.',
+        'warn',
       );
     } else {
       toast(

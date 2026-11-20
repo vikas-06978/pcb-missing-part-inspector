@@ -370,11 +370,30 @@ asked that will guess, confidently. The honest version of that feature is
 classical, detecting footprints with no component on them, and it is not built
 yet.
 
-**Evidence:** tested against a stub that returns what real models return:
-clean designators, a sentence containing one, `UNKNOWN`, and a rambling
-paragraph that merely contains something designator-shaped. The first two are
-accepted, the last two rejected. With Ollama absent, the status endpoint
-explains itself, the button stays hidden and nothing else changes.
+**Evidence, and it is not flattering.** Installed Ollama and ran
+`qwen2.5vl:3b` over all 41 parts: **30 correct, 8 confidently wrong, 3
+declined, at 48 s per part**. Seven of the eight wrong answers were the
+designator of a *different real component* on the same board. It reads the
+neighbour's label.
+
+An earlier 8-part sample had read 7 of 8 and I nearly reported that. It was
+misleading: those eight were isolated parts along the top edge. The full run
+is the honest number.
+
+That failure pattern is at least exploitable. Two parts cannot share a
+designator, so when several claim the same one, all the claimants are refused.
+My first attempt rejected duplicates *as they arrived*, which was wrong in an
+instructive way: the mistaken answer usually lands before the real part's
+turn, so it rejected the correct name and left the wrong one. Measured, it
+dropped correct answers from 30 to 26 and removed **zero** wrong ones.
+Resolving conflicts after collecting everything halves the wrong answers,
+8 to 4, at the cost of 4 correct ones. That is the right trade: a declined
+part visibly still needs naming, a wrong one looks finished.
+
+**And the conclusion the numbers force:** one in ten names still wrong, 33
+minutes per board, and you must check all 41 anyway. Typing them with Enter
+takes a couple of minutes. The feature ships off by default with this measured
+table in the README rather than a claim that it works.
 
 ---
 
