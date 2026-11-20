@@ -439,20 +439,23 @@ async function readNames() {
   const original = button.innerHTML;
   state.readingNames = true;
 
-  // Collect every suggestion first, then decide. Measured on the sample board,
-  // the model's mistakes are almost entirely neighbour confusion: seven of its
+  // Each suggestion is applied as it arrives, so the list visibly fills in
+  // while the model works. At roughly a minute a part, a run that showed
+  // nothing until the end would look like it had hung.
+  //
+  // Conflicts are settled afterwards. Measured on the sample board, the
+  // model's mistakes are almost entirely neighbour confusion: seven of its
   // eight wrong answers were the designator of a different real component.
+  // Two parts cannot share a designator, so when several claim the same one,
+  // at least one is wrong and nothing says which. Every claimant is then put
+  // back to its placeholder rather than guessed between.
   //
-  // Two parts cannot share a designator, so when several parts claim the same
-  // one, at least one of them is wrong and there is no way to tell which. All
-  // the claimants are refused rather than guessed between, which turns a
-  // silent mislabel into a part that still visibly needs naming.
-  //
-  // Resolving after the fact matters: rejecting duplicates as they arrive
-  // simply rejects whichever claim lands second, and the wrong answer usually
-  // arrives first. Tried that; it dropped correct names without removing a
-  // single wrong one.
+  // Settling as they arrive does not work: the mistaken answer usually lands
+  // before the real part's turn, so it rejects the correct name and keeps the
+  // wrong one. Tried that; it dropped correct names without removing a single
+  // wrong one.
   const suggestions = new Map();
+  const placeholders = new Map(parts.map((p) => [p.id, p.name]));
   let unreadable = 0;
 
   try {
@@ -461,8 +464,12 @@ async function readNames() {
       button.textContent = `Stop (${index + 1}/${parts.length})`;
       try {
         const { name } = await api.suggestName(part.id);
-        if (name) suggestions.set(part.id, name.trim());
-        else unreadable += 1;
+        if (name) {
+          suggestions.set(part.id, name.trim());
+          annotator.renamePart(part.id, name.trim());
+        } else {
+          unreadable += 1;
+        }
       } catch (error) {
         toast('Stopped reading labels', error.message, 'error');
         break;
@@ -475,23 +482,21 @@ async function readNames() {
       claims.set(key, (claims.get(key) || 0) + 1);
     }
 
-    let read = 0;
     let contested = 0;
     for (const [partId, name] of suggestions) {
       if (claims.get(name.toLowerCase()) > 1) {
+        annotator.renamePart(partId, placeholders.get(partId) || 'Part');
         contested += 1;
-      } else {
-        annotator.renamePart(partId, name);
-        read += 1;
       }
     }
     await savePartsNow();
 
+    const read = suggestions.size - contested;
     const left = unreadable + contested;
     if (read) {
       toast(
         `Read ${read} of ${parts.length} labels`,
-        `${left ? `${left} left for you${contested ? ` (${contested} contested)` : ''}. ` : ''}`
+        `${left ? `${left} left as placeholders${contested ? ` (${contested} contested)` : ''}. ` : ''}`
         + 'Check every name against the board: roughly one in ten can still be '
         + 'the neighbouring part’s label.',
         'warn',
