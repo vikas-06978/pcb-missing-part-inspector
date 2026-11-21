@@ -317,6 +317,14 @@ There is no tool palette on purpose. Figma needs one because it draws a dozen
 kinds of object; here there is exactly one, and a mode you can leave in the
 wrong state is a trap rather than a feature.
 
+### Adding boards to inspect
+
+Drop as many photographs as you like anywhere on the Inspect screen, up to
+twelve at a time; the whole screen is the target, not a panel within it, and
+it says so while you are dragging. **Add photos** does the same through a
+file picker and takes a multiple selection, for anyone who would rather
+click than drag.
+
 ### A box with nothing in it
 
 Drag a part's box off its component by accident and the tool will not notice

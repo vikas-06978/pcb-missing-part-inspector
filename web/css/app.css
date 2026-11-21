@@ -546,12 +546,47 @@ u { text-decoration-color: var(--brand-line); text-underline-offset: 3px; }
 /* Dropping onto the whole screen. No border or background of its own until
    something is actually being dragged over it, so it costs nothing to look
    at and is unmistakable at the moment it matters. */
+#step-inspect { position: relative; }
 #step-inspect.is-over {
   outline: 2px dashed var(--brand);
   outline-offset: -8px;
   border-radius: var(--radius-lg);
   background: var(--brand-soft);
 }
+
+/* Said out loud while something is being dragged, rather than left as an
+   outline to interpret. Dropping a folder of boards at once is the quickest
+   way to use this screen and it was the least visible, because the panel
+   that used to advertise it stands down as soon as there are results. */
+#step-inspect.is-over::after {
+  content: "Drop to inspect · up to 12 at once";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  /* Above the cards, not behind them. Painted into the flow it came out
+     half-hidden between two boards, which is worse than no message. */
+  z-index: 5;
+  padding: 12px 22px;
+  border-radius: 99px;
+  background: var(--surface-1);
+  border: 1px solid var(--brand-line);
+  box-shadow: var(--shadow-3);
+  font-size: 1rem;
+  font-weight: 640;
+  letter-spacing: -0.01em;
+  color: var(--brand);
+  pointer-events: none;
+}
+
+/* The same thing said quietly when nothing is being dragged, so it is known
+   before it is needed. */
+.drop-hint {
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+@media (max-width: 1100px) { .drop-hint { display: none; } }
 
 .dropzone__icon {
   width: 46px; height: 46px;
