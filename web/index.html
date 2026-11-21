@@ -136,28 +136,13 @@
 
   <!-- ================= STEP 2 : PARTS ================= -->
   <section class="panel is-hidden" id="step-parts" data-step="parts">
-    <header class="panel__head">
-      <div>
-        <h2>Name every part you want checked</h2>
-        <p>Drag a box around a component, then give it the name the operator will
-           see. You only do this once per board.</p>
-      </div>
-      <div class="row">
-        <button class="btn btn--ghost" id="suggest-parts" type="button">
-          <svg viewBox="0 0 24 24" class="btn__icon" aria-hidden="true"><path d="m12 3 2.1 5.2L19.5 10l-5.4 1.8L12 17l-2.1-5.2L4.5 10l5.4-1.8Z"/><path d="M18.5 15.5 19.4 18l2.5.9-2.5.9-.9 2.5-.9-2.5-2.5-.9 2.5-.9Z"/></svg>
-          Auto-detect
-        </button>
-        <button class="btn btn--primary" id="to-inspect" type="button">Start inspecting</button>
-      </div>
-    </header>
-
+    
     <div class="editor">
       <div class="editor__stage">
         <div class="stage-toolbar">
-          <p class="stage-hint stage-hint--lead">
-            <b>Drag</b> to add a part &middot; <b>scroll</b> to move &middot;
-            <kbd>Ctrl</kbd>+scroll to zoom &middot; double-click empty board to fit
-          </p>
+          <div class="stage-toolbar__lead">
+            <h2>Name every part you want checked</h2>
+          </div>
 
           <div class="toolgroup">
             <button class="icon-btn icon-btn--sm" id="zoom-out" type="button" title="Zoom out (−)" aria-label="Zoom out">
@@ -176,6 +161,14 @@
             <span class="tool-sep" aria-hidden="true"></span>
             <button class="btn btn--ghost btn--sm" id="clear-parts" type="button">Clear all</button>
           </div>
+
+          <div class="stage-toolbar__actions">
+            <button class="btn btn--ghost btn--sm" id="suggest-parts" type="button">
+              <svg viewBox="0 0 24 24" class="btn__icon" aria-hidden="true"><path d="m12 3 2.1 5.2L19.5 10l-5.4 1.8L12 17l-2.1-5.2L4.5 10l5.4-1.8Z"/><path d="M18.5 15.5 19.4 18l2.5.9-2.5.9-.9 2.5-.9-2.5-2.5-.9 2.5-.9Z"/></svg>
+              Auto-detect
+            </button>
+            <button class="btn btn--primary btn--sm" id="to-inspect" type="button">Start inspecting</button>
+          </div>
         </div>
         <div class="canvas-host" id="canvas-host">
           <canvas id="annotator"></canvas>
@@ -187,9 +180,12 @@
 
       <aside class="editor__side">
         <div class="side-head">
-          <h3>Parts <span class="count-pill" id="parts-count">0</span>
-            <span class="count-pill count-pill--todo is-hidden" id="parts-remaining">0 to name</span></h3>
-          <div class="row">
+          <div class="side-head__title">
+            <h3>Parts</h3>
+            <span class="count-pill" id="parts-count">0</span>
+            <span class="count-pill count-pill--todo is-hidden" id="parts-remaining">0 to name</span>
+          </div>
+          <div class="side-head__actions">
           <button class="btn btn--ghost btn--sm" id="review-names" type="button" disabled
                   title="See every part as a picture with the name you gave it, to check them before inspecting.">
             <svg viewBox="0 0 24 24" class="btn__icon" aria-hidden="true"><path d="M4 5h7v6H4zM13 5h7v6h-7zM4 13h7v6H4zM13 13h7v6h-7z"/></svg>
@@ -202,13 +198,15 @@
           </button>
           <button class="btn btn--ghost btn--sm" id="inspect-part" type="button"
                   title="Open a part close up so you can see what it is and type its name. This does not read the printed designators.">
-            Open part viewer
+            <svg viewBox="0 0 24 24" class="btn__icon" aria-hidden="true"><path d="M4 7h16v12H4z"/><path d="M9 7V5h6v2"/></svg>
+            Part viewer
           </button>
           <button class="btn btn--ghost btn--sm" id="rename-all" type="button"
                   title="Renumber every box in reading order: Part 1, Part 2, Part 3. This does not read the printed designators.">
+            <svg viewBox="0 0 24 24" class="btn__icon" aria-hidden="true"><path d="M4 7h10M4 12h10M4 17h10M18 5v14M18 5l-2.5 2.5M18 5l2.5 2.5"/></svg>
             Renumber
           </button>
-        </div>
+          </div>
         </div>
         <ul class="part-list" id="part-list"></ul>
         <div class="side-empty" id="parts-empty">

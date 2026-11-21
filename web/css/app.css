@@ -543,6 +543,24 @@ u { text-decoration-color: var(--brand-line); text-underline-offset: 3px; }
 }
 .dropzone--compact { min-height: 180px; padding: 28px; }
 
+/* Once there are boards on screen, the place to drop more is no longer the
+   most important thing on it. A 180 px target holding nothing but an arrow,
+   sitting above the evidence the operator came to look at, is space spent on
+   the easy half of the job. It shrinks to a bar and stays a drop target; the
+   full version comes back when the screen is empty again. */
+.dropzone--slim {
+  min-height: 0;
+  padding: 11px 18px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+}
+.dropzone--slim .dropzone__icon { width: 20px; height: 20px; }
+.dropzone--slim .dropzone__title { font-size: 0.86rem; margin: 0; }
+.dropzone--slim .dropzone__hint { font-size: 0.78rem; margin: 0; }
+
 .dropzone__icon {
   width: 46px; height: 46px;
   fill: none; stroke: var(--text-dim);
@@ -654,6 +672,41 @@ u { text-decoration-color: var(--brand-line); text-underline-offset: 3px; }
   background: var(--surface-2);
 }
 .toolgroup { display: flex; align-items: center; gap: 4px; }
+
+/* The stage toolbar now carries the screen's title and its two actions as
+   well as the zoom controls. It used to repeat, in shorter words, the hint
+   the banner above it was already giving, while the title and the actions
+   sat in a band of their own. Three stacked bands of chrome stood between
+   the operator and the board they came to work on; this is one. */
+.stage-toolbar__lead { min-width: 0; }
+.stage-toolbar__lead h2 {
+  margin: 0;
+  font-size: 0.98rem;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+/* Below this the toolbar's own controls need the room, and a heading cut to
+   "Name every part ..." is worse than no heading: the step indicator at the
+   top of the window already says Parts, Name each component. The lead keeps
+   its place in the layout so the controls stay where the eye expects. */
+@media (max-width: 1240px) {
+  /* The whole lead goes, not just its text: an empty element still holds its
+     place and leaves the controls stranded in the middle of the bar. */
+  .stage-toolbar__lead { display: none; }
+}
+/* The actions hold the right-hand end at every width. Letting the title's
+   auto margin do that job meant they drifted inward the moment the title was
+   hidden, which is the kind of thing that only shows up on a smaller screen
+   than the one it was built on. */
+.stage-toolbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  padding-left: 12px;
+  border-left: 1px solid var(--border);
+}
 .stage-hint {
   margin: 0 auto 0 4px;
   color: var(--text-dim);
@@ -821,12 +874,35 @@ u { text-decoration-color: var(--brand-line); text-underline-offset: 3px; }
 .side-head {
   flex: none;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
   gap: 10px;
   padding: 13px 15px;
   border-bottom: 1px solid var(--border);
 }
+.side-head__title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.side-head__title h3 { margin: 0; }
+
+/* Four actions of their own accord sat in a ragged column, each a different
+   width, which is what a panel looks like when nobody decided. A two-column
+   grid makes them one block; an odd one out spans the full width rather than
+   leaving a hole, so the panel looks the same whether or not the optional
+   label reader is installed. */
+.side-head__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.side-head__actions .btn {
+  width: 100%;
+  justify-content: flex-start;
+  white-space: nowrap;
+}
+.side-head__actions .btn.is-hidden { display: none; }
+.side-head__actions.is-odd .btn:last-child { grid-column: 1 / -1; }
 .count-pill {
   display: inline-grid;
   place-items: center;

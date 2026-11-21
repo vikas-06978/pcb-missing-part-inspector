@@ -161,6 +161,7 @@ async function uploadReference(file) {
     await refreshProject(project);
     state.results = [];
     $('#results').innerHTML = '';
+    refreshDropzoneSize();
     $('#batch-summary').classList.add('is-hidden');
     $('#inspect-empty').classList.remove('is-hidden');
     $('#export-report').disabled = true;
@@ -218,6 +219,36 @@ async function refreshNamingButton() {
     state.namingRoute = '';
     button.classList.add('is-hidden');
   }
+  balanceSideActions();
+}
+
+/**
+ * Let the last action span the row when there is an odd number of them.
+ *
+ * The panel's buttons sit in a two-column grid. CSS can spot an odd count on
+ * its own with :nth-of-type, but that counts elements the browser is not
+ * drawing, and the label reader's button is hidden whenever it is not
+ * installed. Counting what is actually visible is the only version that is
+ * right in both cases, and a hole in the corner of a four-button block is
+ * exactly the sort of thing that makes a panel look unfinished.
+ */
+function balanceSideActions() {
+  const actions = $('#review-names')?.parentElement;
+  if (!actions) return;
+  const visible = [...actions.children].filter((b) => !b.classList.contains('is-hidden'));
+  actions.classList.toggle('is-odd', visible.length % 2 === 1);
+}
+
+/**
+ * Shrink the drop target once there is something to look at.
+ *
+ * Called wherever the result list changes, so the Inspect screen gives its
+ * height to the boards rather than to an empty rectangle.
+ */
+function refreshDropzoneSize() {
+  const zone = $('#test-drop');
+  if (!zone) return;
+  zone.classList.toggle('dropzone--slim', state.results.length > 0);
 }
 
 /**
@@ -689,6 +720,7 @@ async function inspect(files) {
     state.results.push(...response.results);
     renderBatchSummary($('#batch-summary'), cumulativeBatch());
     await renderCards($('#results'), response.results, openDetail);
+    refreshDropzoneSize();
     $('#export-report').disabled = state.results.length === 0;
 
     const bad = response.batch.missing_boards;
@@ -742,6 +774,7 @@ async function restoreRuns() {
     renderBatchSummary($('#batch-summary'), cumulativeBatch());
     await renderCards($('#results'), loaded, openDetail);
     $('#export-report').disabled = false;
+    refreshDropzoneSize();
   } catch {
     /* restoring history is a convenience; never block startup on it */
   }
@@ -848,6 +881,7 @@ function wireMenu() {
       if (!ok) return;
       state.results = [];
       $('#results').innerHTML = '';
+    refreshDropzoneSize();
       $('#batch-summary').classList.add('is-hidden');
       $('#inspect-empty').classList.remove('is-hidden');
       await refreshProject(await api.createProject());
@@ -874,6 +908,7 @@ function wireMenu() {
       await api.clearRuns();
       state.results = [];
       $('#results').innerHTML = '';
+    refreshDropzoneSize();
       $('#batch-summary').classList.add('is-hidden');
       $('#inspect-empty').classList.remove('is-hidden');
       $('#export-report').disabled = true;
@@ -899,6 +934,7 @@ function wireMenu() {
       const project = await api.importProject(file);
       state.results = [];
       $('#results').innerHTML = '';
+    refreshDropzoneSize();
       await refreshProject(project);
       toast('Setup imported', `${project.parts.length} parts restored.`, 'success');
       goTo(project.parts.length ? 'inspect' : 'parts');
