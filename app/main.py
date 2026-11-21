@@ -29,6 +29,7 @@ from app.config import (
     APP_NAME,
     APP_VERSION,
     DEFAULT_SENSITIVITY,
+    EMPTY_BOX_FRACTION,
     MAX_TEST_IMAGES_PER_RUN,
     MAX_UPLOAD_BYTES,
     SENSITIVITY_PRESETS,
@@ -36,7 +37,7 @@ from app.config import (
     WORKING_LONG_EDGE,
 )
 from app.imaging import ImageError, decode_upload, fit_to_reference, to_working_size
-from app.vision import crop_pair, inspect, suggest_parts
+from app.vision import crop_pair, empty_box_fractions, inspect, suggest_parts
 
 app = FastAPI(title=APP_NAME, version=APP_VERSION, docs_url="/api/docs", redoc_url=None)
 
@@ -319,6 +320,25 @@ def _label_convention(reference: np.ndarray, project: storage.Project):
     convention = silkscreen.learn_convention(reference, [p.bbox for p in project.parts])
     _convention_cache = (key, convention)
     return convention
+
+
+@app.post("/api/project/check-boxes")
+def check_boxes() -> dict[str, Any]:
+    """Which part boxes have no component inside them.
+
+    Asked before an inspection rather than during one, because an inspection
+    cannot discover this: a box on bare board agrees with the reference every
+    single time, so it reports the part present and never says a word.
+    """
+    project = _require_project()
+    reference = _require_reference(project)
+    fractions = empty_box_fractions(reference, [p.bbox for p in project.parts])
+    empty = [
+        {"id": part.id, "name": part.name, "covered": round(fraction, 3)}
+        for part, fraction in zip(project.parts, fractions)
+        if fraction < EMPTY_BOX_FRACTION
+    ]
+    return {"empty": empty, "checked": len(fractions)}
 
 
 @app.get("/api/naming/status")

@@ -398,6 +398,7 @@ function renderPartListInner(annotator) {
     row.dataset.id = part.id;
     if (annotator.isSelected(part.id)) row.classList.add('is-selected');
     if (isPlaceholder(part.name)) row.classList.add('is-unnamed');
+    if (state.emptyBoxIds?.has(part.id)) row.classList.add('is-empty-box');
 
     row.innerHTML = `
       <span class="part-row__index">${index + 1}</span>
@@ -439,7 +440,11 @@ function renderPartListInner(annotator) {
           if (next) { next.focus(); next.select(); } else input.blur();
         }
       }
-      event.stopPropagation();      // let the editor keep Delete / arrows
+      // Everything else stays in the field so the editor keeps Delete and the
+      // arrow keys, except undo, which belongs to the board rather than to
+      // this one input and is the only way back from a mis-dragged box.
+      const accel = event.ctrlKey || event.metaKey;
+      if (!(accel && event.key.toLowerCase() === 'z')) event.stopPropagation();
     });
 
     row.addEventListener('click', (event) => {
@@ -1012,6 +1017,39 @@ async function main() {
     // which component that was, so it is worth one question. Asking on every
     // run, including the ones where everything is named, would just be a
     // dialog people learn to dismiss without reading.
+    // A box with nothing inside it is the one mistake an inspection cannot
+    // find for you: bare board matches bare board, so it reports the part
+    // present every time while the component it was drawn around goes
+    // unwatched. Asked here because this is the last moment before that
+    // starts happening.
+    try {
+      const { empty } = await api.checkBoxes();
+      state.emptyBoxIds = new Set(empty.map((p) => p.id));
+      renderPartList();
+      if (empty.length) {
+        const names = empty.map((p) => p.name).join(', ');
+        const go = await confirmAction({
+          title: empty.length === 1
+            ? 'One box has no component in it'
+            : `${empty.length} boxes have no component in them`,
+          body: `${names}. A box on bare board matches the reference on every `
+            + 'photo, so it will report its part present for ever and the '
+            + 'component it was meant to watch will not be checked at all. '
+            + 'Drag it back onto the component, or delete it.',
+          confirmLabel: 'Show me',
+          cancelLabel: 'Inspect anyway',
+        });
+        if (go) {
+          const first = empty[0];
+          state.annotator?.focusPart(first.id);
+          state.annotator?.select(first.id);
+          return;
+        }
+      }
+    } catch {
+      /* the check is a courtesy; never block inspecting on it */
+    }
+
     const unnamed = (state.annotator?.getParts() || [])
       .filter((p) => isPlaceholder(p.name)).length;
     if (unnamed) {

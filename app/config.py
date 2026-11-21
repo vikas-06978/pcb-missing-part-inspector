@@ -306,6 +306,13 @@ SENSITIVITY_PRESETS: dict[str, SensitivityPreset] = {
     ),
 }
 
+#: A part box is called empty when less than this fraction of it has anything
+#: on it but bare solder mask. Measured on the sample board: every real part
+#: covers at least 0.87 of its box and bare board covers 0.00, so the line
+#: sits in a gap with nothing near it. It is only ever used to raise a
+#: question with the operator, never to move or delete anything.
+EMPTY_BOX_FRACTION = 0.25
+
 DEFAULT_SENSITIVITY = "balanced"
 
 # --------------------------------------------------------------------------

@@ -317,6 +317,29 @@ There is no tool palette on purpose. Figma needs one because it draws a dozen
 kinds of object; here there is exactly one, and a mode you can leave in the
 wrong state is a trap rather than a feature.
 
+### A box with nothing in it
+
+Drag a part's box off its component by accident and the tool will not notice
+on its own, because nothing downstream can: an empty box compares bare board
+against bare board, agrees with the reference on every photograph, and
+reports its part present for ever. The count of checked parts stays
+reassuring while one of them means nothing and the real component goes
+unwatched.
+
+So it is checked on the reference instead, where the question can actually be
+asked. Pressing **Start inspecting** measures how much of each box has
+anything but bare solder mask in it, and names the ones that are empty before
+any inspecting happens. Measured on the sample board, every real part covers
+at least 87% of its box and bare board covers 0%, so the line between them
+sits in a gap with nothing near it. Those rows stay marked in the part list
+afterwards, because a dialog is dismissed once and the box stays wrong until
+somebody moves it.
+
+Neither **Renumber** nor **Auto-detect** will put a stray box right, and they
+are not meant to: one renames, the other proposes boxes and leaves existing
+ones alone. `Ctrl+Z` is the way back, and it now works while you are typing a
+name, which is where the caret usually is on that screen.
+
 ### Checking the names before you inspect
 
 **Review names** shows every part as a photograph with the name you gave it

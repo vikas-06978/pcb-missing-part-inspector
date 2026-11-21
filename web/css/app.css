@@ -1867,3 +1867,18 @@ dialog::backdrop { background: rgba(3, 6, 11, 0.68); backdrop-filter: blur(5px);
   padding-right: 2px;
 }
 .stat--review .stat__value { color: var(--review); }
+
+/* A box the operator has moved off its component. Marked in the list as well
+   as raised in a dialog, because the dialog is dismissed once and the box
+   stays wrong until somebody moves it. */
+.part-row.is-empty-box::before {
+  content: "";
+  width: 3px;
+  height: 17px;
+  margin-left: -5px;
+  margin-right: -1px;
+  border-radius: 99px;
+  background: var(--missing);
+  flex: none;
+}
+.part-row.is-empty-box .part-row__name { color: var(--missing); }

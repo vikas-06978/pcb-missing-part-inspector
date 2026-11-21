@@ -75,6 +75,7 @@ export const api = {
 
   suggest: () => request('/api/project/suggest', { method: 'POST' }),
 
+  checkBoxes: () => request('/api/project/check-boxes', { method: 'POST' }),
   namingStatus: () => request('/api/naming/status'),
 
   suggestName: (partId) =>

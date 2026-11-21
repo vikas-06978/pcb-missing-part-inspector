@@ -92,17 +92,15 @@ def _merge_overlapping(
     return merged
 
 
-def suggest_parts(image_bgr: np.ndarray) -> list[dict]:
-    """Return candidate component boxes, largest first.
+def _component_mask(image_bgr: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Everything on the board that is not bare solder mask.
 
-    Each item is ``{"bbox": [x, y, w, h], "score": float}``. Scores are a
-    rough prominence ranking used only to order the list in the UI.
+    Returns ``(components, board)``. Split out of the suggester so that the
+    same judgement can answer a different question: not only "where might a
+    part be" but "is there a part here at all".
     """
-    height, width = image_bgr.shape[:2]
     blurred = cv2.bilateralFilter(image_bgr, 7, 60, 60)
-
     mask = board_mask(blurred)
-    board_area = max(int(np.count_nonzero(mask)), 1)
 
     colour = _colour_distance_map(blurred, mask)
     _, foreground = cv2.threshold(colour, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
@@ -117,6 +115,50 @@ def suggest_parts(image_bgr: np.ndarray) -> list[dict]:
         foreground, cv2.MORPH_CLOSE,
         cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)), iterations=1,
     )
+    return foreground, mask
+
+
+def empty_box_fractions(
+    image_bgr: np.ndarray, boxes: list[list[int]]
+) -> list[float]:
+    """How much of each box has something on it, as a fraction of its area.
+
+    A box that has been dragged onto bare board is the quietest mistake this
+    tool can carry. It compares bare board against bare board, so it reports
+    the part present on every photograph, for ever, while the component it
+    was drawn around is no longer being looked at by anything. The count of
+    checked parts stays reassuring and one of them means nothing.
+
+    This cannot be inferred from the inspection itself, which only ever sees
+    agreement. It has to be noticed on the reference, by asking whether there
+    is a component inside the box at all.
+    """
+    if not boxes:
+        return []
+    foreground, _ = _component_mask(image_bgr)
+    height, width = foreground.shape[:2]
+
+    out: list[float] = []
+    for box in boxes:
+        x, y, w, h = (int(v) for v in box[:4])
+        x0, y0 = max(0, x), max(0, y)
+        x1, y1 = min(width, x + w), min(height, y + h)
+        region = foreground[y0:y1, x0:x1]
+        out.append(
+            float(np.count_nonzero(region)) / region.size if region.size else 0.0
+        )
+    return out
+
+
+def suggest_parts(image_bgr: np.ndarray) -> list[dict]:
+    """Return candidate component boxes, largest first.
+
+    Each item is ``{"bbox": [x, y, w, h], "score": float}``. Scores are a
+    rough prominence ranking used only to order the list in the UI.
+    """
+    height, width = image_bgr.shape[:2]
+    foreground, mask = _component_mask(image_bgr)
+    board_area = max(int(np.count_nonzero(mask)), 1)
 
     count, labels, stats, _ = cv2.connectedComponentsWithStats(foreground, connectivity=8)
 

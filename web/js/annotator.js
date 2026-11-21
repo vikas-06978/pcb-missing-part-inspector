@@ -767,11 +767,18 @@ export class Annotator {
         event.preventDefault();
       }
       if (!this.isActive || !this.isActive()) return;
-      if (typing(event.target)) return;
 
       const key = event.key.toLowerCase();
       const accel = event.ctrlKey || event.metaKey;
 
+      // Undo is handled before the check for a focused text field, unlike
+      // every other shortcut here. On this screen the caret is nearly always
+      // sitting in a part's name box, so skipping undo while typing meant
+      // skipping it almost always: drag a part somewhere by accident and
+      // there was no way back, which is how it was reported. There is
+      // nothing a 40-character name field needs Ctrl+Z for that is worth
+      // that. A snapshot covers names as well as boxes, so one meaning holds
+      // throughout: undo the last change to the parts.
       if (accel && key === 'z') {
         event.preventDefault();
         if (event.shiftKey) this.redo();
@@ -779,6 +786,8 @@ export class Annotator {
         return;
       }
       if (accel && key === 'y') { event.preventDefault(); this.redo(); return; }
+
+      if (typing(event.target)) return;
       if (accel && key === 'a') { event.preventDefault(); this.selectAll(); return; }
       if (accel && key === 'd') { event.preventDefault(); this.duplicateSelected(); return; }
 
