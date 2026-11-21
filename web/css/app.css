@@ -543,23 +543,15 @@ u { text-decoration-color: var(--brand-line); text-underline-offset: 3px; }
 }
 .dropzone--compact { min-height: 180px; padding: 28px; }
 
-/* Once there are boards on screen, the place to drop more is no longer the
-   most important thing on it. A 180 px target holding nothing but an arrow,
-   sitting above the evidence the operator came to look at, is space spent on
-   the easy half of the job. It shrinks to a bar and stays a drop target; the
-   full version comes back when the screen is empty again. */
-.dropzone--slim {
-  min-height: 0;
-  padding: 11px 18px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 10px;
-  text-align: left;
+/* Dropping onto the whole screen. No border or background of its own until
+   something is actually being dragged over it, so it costs nothing to look
+   at and is unmistakable at the moment it matters. */
+#step-inspect.is-over {
+  outline: 2px dashed var(--brand);
+  outline-offset: -8px;
+  border-radius: var(--radius-lg);
+  background: var(--brand-soft);
 }
-.dropzone--slim .dropzone__icon { width: 20px; height: 20px; }
-.dropzone--slim .dropzone__title { font-size: 0.86rem; margin: 0; }
-.dropzone--slim .dropzone__hint { font-size: 0.78rem; margin: 0; }
 
 .dropzone__icon {
   width: 46px; height: 46px;
@@ -590,22 +582,50 @@ u { text-decoration-color: var(--brand-line); text-underline-offset: 3px; }
    9. Reference preview
    -------------------------------------------------------------------------- */
 
+/* The reference photo is the one thing on this screen, and the whole of it
+   matters: it is what every later board is measured against. It used to be
+   sized to the column's width and left to be whatever height that implied,
+   which on a wide screen is taller than the window, so the board ran off the
+   bottom and the panel scrolled. A reference you have to scroll to see is not
+   showing you the reference. It fits the space it is given instead. */
 .reference-preview {
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
   gap: 24px;
-  align-items: start;
+  align-items: stretch;
 }
-@media (max-width: 900px) { .reference-preview { grid-template-columns: 1fr; } }
+@media (max-width: 900px) {
+  .reference-preview { grid-template-columns: 1fr; align-items: start; }
+  .preview-frame { min-height: 260px; }
+}
 
 .preview-frame {
+  min-height: 0;
+  /* Flex, not grid with place-items. In a grid whose row is auto-sized, a
+     child's max-height: 100% resolves against the content, so the image
+     happily reported 702px inside a 572px frame and ran off the bottom.
+     Against a flex container of definite height it resolves against the
+     frame, which is the thing it is supposed to fit. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   background: var(--canvas-bg);
   overflow: hidden;
   box-shadow: var(--shadow-3);
 }
-.preview-frame img { display: block; width: 100%; height: auto; }
+.preview-frame img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  border-radius: var(--radius);
+}
 
 .preview-meta h3 { margin-bottom: 14px; }
 

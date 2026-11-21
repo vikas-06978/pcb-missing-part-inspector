@@ -248,7 +248,12 @@ function balanceSideActions() {
 function refreshDropzoneSize() {
   const zone = $('#test-drop');
   if (!zone) return;
-  zone.classList.toggle('dropzone--slim', state.results.length > 0);
+  // Hidden rather than shrunk. Squeezed down to a bar it became a wide empty
+  // strip with a few small words adrift in the middle of it, which looks
+  // like a thing that failed to load rather than a thing you can use. With
+  // boards on screen the drop target is the screen, and the header carries a
+  // plain button for the people who would rather click than drag.
+  zone.classList.toggle('is-hidden', state.results.length > 0);
 }
 
 /**
@@ -801,14 +806,18 @@ function openDetail(result) {
    Drag, drop and paste
    ========================================================================= */
 
-function wireDropzone(element, input, handler, { multiple = false } = {}) {
-  element.addEventListener('click', () => input.click());
-  element.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      input.click();
-    }
-  });
+function wireDropzone(element, input, handler, { multiple = false, clickToBrowse = true } = {}) {
+  // A whole screen can be a place to drop files without being a place that
+  // opens a file picker when you click it.
+  if (clickToBrowse) {
+    element.addEventListener('click', () => input.click());
+    element.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        input.click();
+      }
+    });
+  }
 
   input.addEventListener('change', () => {
     const files = imageFilesFrom(input.files);
@@ -980,6 +989,11 @@ async function main() {
 
   wireDropzone($('#reference-drop'), $('#file-reference'), uploadReference);
   wireDropzone($('#test-drop'), $('#file-tests'), inspect, { multiple: true });
+  // The whole screen takes a drop once there are boards on it, because by
+  // then the panel that used to invite one has stood down.
+  wireDropzone($('#step-inspect'), $('#file-tests'), inspect,
+               { multiple: true, clickToBrowse: false });
+  $('#add-photos').addEventListener('click', () => $('#file-tests').click());
 
   $('#stepper').addEventListener('click', (event) => {
     const button = event.target.closest('.stepper__item');
